@@ -1,0 +1,94 @@
+package com.example.chunkpreload;
+
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import net.fabricmc.loader.api.FabricLoader;
+
+import java.io.IOException;
+import java.io.Reader;
+import java.io.Writer;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+
+/**
+ * Simple JSON config stored at config/chunkpreload.json.
+ * Edit it and restart the server/game to change the radius or how much
+ * time per tick the preloader is allowed to spend generating chunks.
+ */
+public class ChunkPreloadConfig {
+	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+	private static final String FILE_NAME = "chunkpreload.json";
+
+	/** Radius, in chunks, to preload around the first player's spawn point. */
+	public int radius = 100;
+   /** If false, chunk preloading and its HUD are switched off entirely - the mod does nothing. */
+	public boolean enabled = true;
+   /**
+	 * If true, generation automatically backs off during ticks where the server is
+	 * already running slow (recent average tick time above the threshold below),
+	 * instead of adding more load on top of an already-busy server.
+   */
+	public boolean adaptiveThrottling = true;
+	/** Roughly how many milliseconds per server tick may be spent generating chunks. */
+	public int maxMillisPerTick = 40;
+   /**
+	 * With C2ME installed, how many chunks may be requested concurrently through the async
+	 * pipeline at once. Higher finishes faster but adds more simultaneous CPU load; lower is
+	 * gentler on weaker/fewer-core hardware. Has no effect without C2ME installed.
+	*/
+	public enum CpuUsageLevel {
+		LOW, MEDIUM, HIGH
+	}
+
+	/**
+	 * With C2ME installed, how aggressively to use available CPU threads/cores for concurrent
+	 * chunk generation. Maps to maxConcurrentAsyncChunks below. Has no effect without C2ME.
+	 */
+	public CpuUsageLevel cpuUsageLevel = CpuUsageLevel.MEDIUM;
+
+	/**
+	 * With C2ME installed, how many chunks may be requested concurrently through the async
+	 * pipeline at once - set indirectly via cpuUsageLevel above, not edited directly in the UI.
+	 * Higher finishes faster but adds more simultaneous CPU load. Has no effect without C2ME.
+	 */
+	public int maxConcurrentAsyncChunks = 8;
+   
+   public boolean showHud = true;
+
+	public static ChunkPreloadConfig load() {
+		Path path = FabricLoader.getInstance().getConfigDir().resolve(FILE_NAME);
+
+		try {
+			if (Files.exists(path)) {
+				try (Reader reader = Files.newBufferedReader(path, StandardCharsets.UTF_8)) {
+					ChunkPreloadConfig config = GSON.fromJson(reader, ChunkPreloadConfig.class);
+
+					if (config != null) {
+						return config;
+					}
+				}
+			}
+		} catch (IOException e) {
+			ChunkPreloadMod.LOGGER.warn("Failed to read {}, falling back to defaults", FILE_NAME, e);
+		}
+
+		ChunkPreloadConfig defaults = new ChunkPreloadConfig();
+		defaults.save();
+		return defaults;
+	}
+
+	public void save() {
+		Path path = FabricLoader.getInstance().getConfigDir().resolve(FILE_NAME);
+
+		try {
+			Files.createDirectories(path.getParent());
+
+			try (Writer writer = Files.newBufferedWriter(path, StandardCharsets.UTF_8)) {
+				GSON.toJson(this, writer);
+			}
+		} catch (IOException e) {
+			ChunkPreloadMod.LOGGER.warn("Failed to write {}", FILE_NAME, e);
+		}
+	}
+}
