@@ -101,7 +101,6 @@ public class ChunkPreloadMod implements ModInitializer {
 
 	private static int tickCounter = 0;
 	private static final int BROADCAST_INTERVAL_TICKS = 5; // ~4 updates/sec is plenty for a progress bar
-	private static final long BUSY_TICK_THRESHOLD_NANOS = 45_000_000L; // 45ms - back off if the server's already this busy
 
 	private static int lastBroadcastDone = -1;
 	private static boolean lastBroadcastActive = false;
@@ -118,15 +117,15 @@ public class ChunkPreloadMod implements ModInitializer {
 			return;
 		}
 
-		// Always process completions and update progress, even if the server is busy.
-		// This ensures tickets are released and the HUD stays responsive.
 		processCompletions(overworld);
 
-		boolean serverIsBusy = CONFIG.adaptiveThrottling
-				&& server.getAverageTickTimeNanos() > BUSY_TICK_THRESHOLD_NANOS;
-
 		if (CONFIG.enabled) {
-			if (!serverIsBusy) {
+			boolean serverIsBusy = CONFIG.adaptiveThrottling
+					&& server.getAverageTickTimeNanos() > (long) (CONFIG.busyTickThresholdMs * 1_000_000L);
+
+			boolean lowMemory = isLowMemory();
+
+			if (!serverIsBusy && !lowMemory) {
 				requestMoreChunks(overworld);
 			}
 
@@ -145,8 +144,15 @@ public class ChunkPreloadMod implements ModInitializer {
 		}
 	}
 
+	private static boolean isLowMemory() {
+		Runtime runtime = Runtime.getRuntime();
+		double used = (double) (runtime.totalMemory() - runtime.freeMemory()) / runtime.maxMemory();
+		return used > CONFIG.memoryUsageThreshold;
+	}
+
 	private static void processCompletions(ServerLevel overworld) {
 		Integer completedIndex;
+		boolean changed = false;
 		while ((completedIndex = pendingCompletionQueue.poll()) != null) {
 			int chunkX = state.centerX + offsetX[completedIndex];
 			int chunkZ = state.centerZ + offsetZ[completedIndex];
@@ -155,10 +161,17 @@ public class ChunkPreloadMod implements ModInitializer {
 
 			inFlightIndices.remove(completedIndex);
 			completedIndices.add(completedIndex);
+			changed = true;
 		}
 
-		while (completedIndices.remove(state.doneCount)) {
-			state.setDoneCount(state.doneCount + 1);
+		if (changed) {
+			int startDoneCount = state.doneCount;
+			while (completedIndices.remove(state.doneCount)) {
+				state.doneCount++;
+			}
+			if (state.doneCount != startDoneCount) {
+				state.setDirty();
+			}
 		}
 	}
 

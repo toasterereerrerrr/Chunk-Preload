@@ -26,10 +26,22 @@ public class ChunkPreloadConfig {
 	public boolean enabled = true;
    /**
 	 * If true, generation automatically backs off during ticks where the server is
-	 * already running slow (recent average tick time above the threshold below),
-	 * instead of adding more load on top of an already-busy server.
+	 * already running slow, instead of adding more load on top of an already-busy server.
    */
 	public boolean adaptiveThrottling = true;
+
+	/**
+	 * The average tick time threshold (in milliseconds) above which the preloader
+	 * will pause generation if adaptiveThrottling is enabled.
+	 */
+	public double busyTickThresholdMs = 45.0;
+
+	/**
+	 * The percentage of maximum memory usage (0.0 to 1.0) above which the preloader
+	 * will pause to allow the GC to catch up and avoid OutOfMemory errors.
+	 */
+	public double memoryUsageThreshold = 0.90;
+
 	/** Roughly how many milliseconds per server tick may be spent generating chunks. */
 	public int maxMillisPerTick = 40;
    /**
