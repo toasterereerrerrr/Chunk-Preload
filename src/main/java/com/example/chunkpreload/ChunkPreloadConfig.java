@@ -33,26 +33,24 @@ public class ChunkPreloadConfig {
 	/** Roughly how many milliseconds per server tick may be spent generating chunks. */
 	public int maxMillisPerTick = 40;
    /**
-	 * With C2ME installed, how many chunks may be requested concurrently through the async
-	 * pipeline at once. Higher finishes faster but adds more simultaneous CPU load; lower is
-	 * gentler on weaker/fewer-core hardware. Has no effect without C2ME installed.
+	 * How many chunks may be requested concurrently through the async pipeline at once.
+	 * Higher finishes faster but adds more simultaneous CPU load; lower is gentler on weaker hardware.
 	*/
 	public enum CpuUsageLevel {
 		LOW, MEDIUM, HIGH
 	}
 
 	/**
-	 * With C2ME installed, how aggressively to use available CPU threads/cores for concurrent
-	 * chunk generation. Maps to maxConcurrentAsyncChunks below. Has no effect without C2ME.
+	 * How aggressively to use available CPU threads/cores for concurrent
+	 * chunk generation. Maps to maxConcurrentAsyncChunks below.
 	 */
 	public CpuUsageLevel cpuUsageLevel = CpuUsageLevel.MEDIUM;
 
 	/**
-	 * With C2ME installed, how many chunks may be requested concurrently through the async
-	 * pipeline at once - set indirectly via cpuUsageLevel above, not edited directly in the UI.
-	 * Higher finishes faster but adds more simultaneous CPU load. Has no effect without C2ME.
+	 * How many chunks may be requested concurrently through the async pipeline at once.
+	 * Higher finishes faster but adds more simultaneous CPU load.
 	 */
-	public int maxConcurrentAsyncChunks = 8;
+	public int maxConcurrentAsyncChunks = 32;
    
    public boolean showHud = true;
 
