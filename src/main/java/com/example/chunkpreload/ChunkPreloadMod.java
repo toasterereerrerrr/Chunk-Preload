@@ -125,7 +125,7 @@ public class ChunkPreloadMod implements ModInitializer {
 
 		boolean serverIsBusy = CONFIG.adaptiveThrottling
 				&& server.getAverageTickTimeNanos() > BUSY_TICK_THRESHOLD_NANOS;
-				LOGGER.info("Server Busy");
+				LOGGER.info("Server Busys");
 
 		if (CONFIG.enabled && !serverIsBusy) {
 			ServerLevel overworld = server.getLevel(ServerLevel.OVERWORLD);
