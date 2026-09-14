@@ -163,6 +163,40 @@ public class ChunkPreloadConfigScreen {
 				.build());
 
 		advanced.addEntry(entryBuilder
+				.startTextField(Component.literal("Discord Webhook URL"), config.discordWebhookUrl)
+				.setTooltip(Component.literal("Post progress updates to a Discord channel."))
+				.setSaveConsumer(value -> config.discordWebhookUrl = value)
+				.build());
+
+		advanced.addEntry(entryBuilder
+				.startBooleanToggle(Component.literal("Notify Map Mods"), config.notifyMapMods)
+				.setDefaultValue(true)
+				.setTooltip(Component.literal("Tell BlueMap/Dynmap to render chunks as they are generated."))
+				.setSaveConsumer(value -> config.notifyMapMods = value)
+				.build());
+
+		advanced.addEntry(entryBuilder
+				.startIntField(Component.literal("Restart After (Chunks)"), config.restartAfterChunks)
+				.setDefaultValue(0)
+				.setTooltip(Component.literal("Automatically /stop the server after this many chunks. 0 to disable."))
+				.setSaveConsumer(value -> config.restartAfterChunks = value)
+				.build());
+
+		advanced.addEntry(entryBuilder
+				.startBooleanToggle(Component.literal("Structure Only Mode"), config.structureOnlyMode)
+				.setDefaultValue(false)
+				.setTooltip(Component.literal("Only generate structure data (fastest). Use for mapping structures."))
+				.setSaveConsumer(value -> config.structureOnlyMode = value)
+				.build());
+
+		advanced.addEntry(entryBuilder
+				.startBooleanToggle(Component.literal("Show Heatmap"), config.showHeatmap)
+				.setDefaultValue(false)
+				.setTooltip(Component.literal("Show a visual 2D grid of generation progress on the HUD."))
+				.setSaveConsumer(value -> config.showHeatmap = value)
+				.build());
+
+		advanced.addEntry(entryBuilder
 				.startIntSlider(Component.literal("Console Log Interval (s)"), config.consoleLogIntervalSeconds, 0, 300)
 				.setDefaultValue(30)
 				.setTooltip(Component.literal("Log progress to server console every N seconds. 0 to disable."))

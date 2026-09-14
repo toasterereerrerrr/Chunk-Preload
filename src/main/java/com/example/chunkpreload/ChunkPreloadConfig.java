@@ -110,6 +110,15 @@ public class ChunkPreloadConfig {
 	/** Minimum free disk space in MB required to continue preloading. */
 	public long minFreeDiskSpaceMb = 512;
 
+	// --- INTEGRATION & AUTOMATION ---
+
+	public String discordWebhookUrl = "";
+	public boolean notifyMapMods = true;
+	public int restartAfterChunks = 0; // 0 to disable
+	public boolean useWorldBorder = false;
+	public boolean structureOnlyMode = false;
+	public boolean showHeatmap = false;
+
 	public static ChunkPreloadConfig load() {
 		Path path = FabricLoader.getInstance().getConfigDir().resolve(FILE_NAME);
 

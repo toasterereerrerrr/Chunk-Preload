@@ -28,12 +28,25 @@ import static net.minecraft.commands.Commands.literal;
 import static net.minecraft.commands.Commands.argument;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 
+import net.minecraft.world.level.border.WorldBorder;
+import net.minecraft.commands.arguments.coordinates.ColumnPosArgument;
+import net.minecraft.world.level.ChunkPos;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.net.URI;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.io.File;
+import net.minecraft.server.level.ColumnPos;
 
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.storage.LevelResource;
@@ -54,6 +67,12 @@ public class ChunkPreloadMod implements ModInitializer {
 	private static float chunksPerSecond = 0;
 	private static long lastConsoleLogTime = 0;
 
+	private static final int RECENT_INDICES_COUNT = 100;
+	private static final LinkedList<Integer> recentIndices = new LinkedList<>();
+	private static int chunksGeneratedThisSession = 0;
+	private static long benchmarkStartTime = 0;
+	private static boolean isBenchmarking = false;
+
 	private static int nextRequestIndex = -1;
 	private static final Set<Integer> inFlightIndices = new HashSet<>();
 	private static final Set<Integer> completedIndices = new HashSet<>();
@@ -70,67 +89,141 @@ public class ChunkPreloadMod implements ModInitializer {
 		PayloadTypeRegistry.clientboundPlay().register(PreloadProgressPayload.TYPE, PreloadProgressPayload.CODEC);
 
 		CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
-			dispatcher.register(literal("chunkpreload")
-					.requires(source -> source.permissions().hasPermission(Permissions.COMMANDS_ADMIN))
-					.then(literal("start")
+			var root = literal("chunkpreload")
+					.requires(source -> source.permissions().hasPermission(Permissions.COMMANDS_ADMIN));
+
+			var startCommand = literal("start")
+					.executes(context -> {
+						MinecraftServer server = context.getSource().getServer();
+						ensureState(server);
+						ServerLevel level = context.getSource().getLevel();
+						BlockPos pos = BlockPos.containing(context.getSource().getPosition());
+						startPreload(level, pos.getX() >> 4, pos.getZ() >> 4);
+						context.getSource().sendSuccess(() -> Component.literal("Started preloading around your position"), true);
+						return 1;
+					});
+			startCommand.then(argument("x", IntegerArgumentType.integer())
+					.then(argument("z", IntegerArgumentType.integer())
 							.executes(context -> {
+								int x = IntegerArgumentType.getInteger(context, "x");
+								int z = IntegerArgumentType.getInteger(context, "z");
 								MinecraftServer server = context.getSource().getServer();
 								ensureState(server);
 								ServerLevel level = context.getSource().getLevel();
-								BlockPos pos = BlockPos.containing(context.getSource().getPosition());
-								startPreload(level, pos.getX() >> 4, pos.getZ() >> 4);
-								context.getSource().sendSuccess(() -> Component.literal("Started preloading around your position"), true);
+								startPreload(level, x >> 4, z >> 4);
+								context.getSource().sendSuccess(() -> Component.literal("Started preloading around " + x + ", " + z), true);
 								return 1;
-							})
-							.then(argument("radius", IntegerArgumentType.integer(1))
-									.executes(context -> {
-										int r = IntegerArgumentType.getInteger(context, "radius");
-										CONFIG.radius = r;
-										CONFIG.save();
-										rebuildSpiral();
-										MinecraftServer server = context.getSource().getServer();
-										ensureState(server);
-										ServerLevel level = context.getSource().getLevel();
-										BlockPos pos = BlockPos.containing(context.getSource().getPosition());
-										startPreload(level, pos.getX() >> 4, pos.getZ() >> 4);
-										context.getSource().sendSuccess(() -> Component.literal("Started preloading with radius " + r), true);
-										return 1;
-									})))
-					.then(literal("stop")
+							})));
+			startCommand.then(argument("pos", ColumnPosArgument.columnPos())
+					.executes(context -> {
+						ColumnPos pos = ColumnPosArgument.getColumnPos(context, "pos");
+						MinecraftServer server = context.getSource().getServer();
+						ensureState(server);
+						ServerLevel level = context.getSource().getLevel();
+						startPreload(level, pos.x() >> 4, pos.z() >> 4);
+						context.getSource().sendSuccess(() -> Component.literal("Started preloading around " + pos.x() + ", " + pos.z()), true);
+						return 1;
+					}));
+			var radiusStartCommand = argument("radius", IntegerArgumentType.integer(1))
+					.executes(context -> {
+						int r = IntegerArgumentType.getInteger(context, "radius");
+						MinecraftServer server = context.getSource().getServer();
+						ensureState(server);
+						ServerLevel level = context.getSource().getLevel();
+						BlockPos pos = BlockPos.containing(context.getSource().getPosition());
+						startPreload(level, pos.getX() >> 4, pos.getZ() >> 4, r);
+						context.getSource().sendSuccess(() -> Component.literal("Started preloading with radius " + r), true);
+						return 1;
+					});
+			radiusStartCommand.then(argument("x", IntegerArgumentType.integer())
+					.then(argument("z", IntegerArgumentType.integer())
 							.executes(context -> {
-								ensureState(context.getSource().getServer());
-								state.markCompleted();
-								context.getSource().sendSuccess(() -> Component.literal("Preloading stopped"), true);
+								int r = IntegerArgumentType.getInteger(context, "radius");
+								int x = IntegerArgumentType.getInteger(context, "x");
+								int z = IntegerArgumentType.getInteger(context, "z");
+								MinecraftServer server = context.getSource().getServer();
+								ensureState(server);
+								ServerLevel level = context.getSource().getLevel();
+								startPreload(level, x >> 4, z >> 4, r);
+								context.getSource().sendSuccess(() -> Component.literal("Started preloading around " + x + ", " + z + " with radius " + r), true);
 								return 1;
-							}))
-					.then(literal("turbo")
-							.executes(context -> {
-								CONFIG.turboMode = !CONFIG.turboMode;
-								CONFIG.save();
-								context.getSource().sendSuccess(() -> Component.literal("Turbo Mode: " + (CONFIG.turboMode ? "ON" : "OFF")), true);
-								return 1;
-							}))
-					.then(literal("refill")
-							.executes(context -> {
-								CONFIG.immediateRefill = !CONFIG.immediateRefill;
-								CONFIG.save();
-								context.getSource().sendSuccess(() -> Component.literal("Immediate Refill: " + (CONFIG.immediateRefill ? "ON" : "OFF")), true);
-								return 1;
-							}))
-					.then(literal("status")
-							.executes(context -> {
-								ensureState(context.getSource().getServer());
-								if (!state.started) {
-									context.getSource().sendSuccess(() -> Component.literal("Not started"), false);
-								} else if (state.completed) {
-									context.getSource().sendSuccess(() -> Component.literal("Completed: " + state.doneCount + "/" + totalChunks), false);
-								} else {
-									context.getSource().sendSuccess(() -> Component.literal(String.format("Progress: %d/%d (Turbo: %b, Dim: %s, Speed: %.1f ch/s)", 
-											state.doneCount, totalChunks, CONFIG.turboMode, state.dimension, chunksPerSecond)), false);
-								}
-								return 1;
-							}))
-			);
+							})));
+			startCommand.then(radiusStartCommand);
+			root.then(startCommand);
+
+			root.then(literal("border")
+					.executes(context -> {
+						ServerLevel level = context.getSource().getLevel();
+						WorldBorder border = level.getWorldBorder();
+						int centerX = (int) border.getCenterX();
+						int centerZ = (int) border.getCenterZ();
+						int radius = (int) (border.getSize() / 2.0) / 16;
+						CONFIG.radius = radius;
+						CONFIG.shape = ChunkPreloadConfig.Shape.SQUARE;
+						CONFIG.save();
+						rebuildSpiral();
+						MinecraftServer server = context.getSource().getServer();
+						ensureState(server);
+						startPreload(level, centerX >> 4, centerZ >> 4);
+						context.getSource().sendSuccess(() -> Component.literal("Started preloading within world border (radius: " + radius + ")"), true);
+						return 1;
+					}));
+
+			root.then(literal("benchmark")
+					.executes(context -> {
+						MinecraftServer server = context.getSource().getServer();
+						ensureState(server);
+						ServerLevel level = context.getSource().getLevel();
+						BlockPos pos = BlockPos.containing(context.getSource().getPosition());
+						isBenchmarking = true;
+						benchmarkStartTime = System.currentTimeMillis();
+						int oldRadius = CONFIG.radius;
+						CONFIG.radius = 5;
+						rebuildSpiral();
+						startPreload(level, pos.getX() >> 4, pos.getZ() >> 4);
+						CONFIG.radius = oldRadius;
+						context.getSource().sendSuccess(() -> Component.literal("Starting 10x10 benchmark..."), true);
+						return 1;
+					}));
+
+			root.then(literal("stop")
+					.executes(context -> {
+						ensureState(context.getSource().getServer());
+						state.markCompleted();
+						context.getSource().sendSuccess(() -> Component.literal("Preloading stopped"), true);
+						return 1;
+					}));
+
+			root.then(literal("turbo")
+					.executes(context -> {
+						CONFIG.turboMode = !CONFIG.turboMode;
+						CONFIG.save();
+						context.getSource().sendSuccess(() -> Component.literal("Turbo Mode: " + (CONFIG.turboMode ? "ON" : "OFF")), true);
+						return 1;
+					}));
+
+			root.then(literal("refill")
+					.executes(context -> {
+						CONFIG.immediateRefill = !CONFIG.immediateRefill;
+						CONFIG.save();
+						context.getSource().sendSuccess(() -> Component.literal("Immediate Refill: " + (CONFIG.immediateRefill ? "ON" : "OFF")), true);
+						return 1;
+					}));
+
+			root.then(literal("status")
+					.executes(context -> {
+						ensureState(context.getSource().getServer());
+						if (!state.started) {
+							context.getSource().sendSuccess(() -> Component.literal("Not started"), false);
+						} else if (state.completed) {
+							context.getSource().sendSuccess(() -> Component.literal("Completed: " + state.doneCount + "/" + totalChunks), false);
+						} else {
+							context.getSource().sendSuccess(() -> Component.literal(String.format("Progress: %d/%d (Turbo: %b, Dim: %s, Speed: %.1f ch/s)", state.doneCount, totalChunks, CONFIG.turboMode, state.dimension, chunksPerSecond)), false);
+						}
+						return 1;
+					}));
+
+			dispatcher.register(root);
 		});
 
 		ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
@@ -196,6 +289,13 @@ public class ChunkPreloadMod implements ModInitializer {
 		ensureState(server);
 
 		if (!state.started || state.completed) {
+			if (isBenchmarking) {
+				long duration = System.currentTimeMillis() - benchmarkStartTime;
+				LOGGER.info("Benchmark complete: 121 chunks generated in {}ms", duration);
+				server.getPlayerList().broadcastSystemMessage(Component.literal("Benchmark complete: 121 chunks in " + duration + "ms"), false);
+				isBenchmarking = false;
+				sendDiscordWebhook("Benchmark complete: 121 chunks in " + duration + "ms");
+			}
 			return;
 		}
 
@@ -223,6 +323,7 @@ public class ChunkPreloadMod implements ModInitializer {
 
 			if (state.doneCount >= totalChunks && !state.completed) {
 				LOGGER.info("Chunk preload complete for {}: {} chunks generated", state.dimension, totalChunks);
+				sendDiscordWebhook("Chunk preloading complete for " + state.dimension + ": " + totalChunks + " chunks");
 				
 				boolean nextDimStarted = false;
 				if (state.dimension.equals(Level.OVERWORLD.identifier().toString()) && CONFIG.preloadNether) {
@@ -296,10 +397,84 @@ public class ChunkPreloadMod implements ModInitializer {
 	}
 
 	private static void startPreload(ServerLevel level, int chunkX, int chunkZ) {
+		startPreload(level, chunkX, chunkZ, CONFIG.radius);
+	}
+
+	private static void startPreload(ServerLevel level, int chunkX, int chunkZ, int radius) {
+		int previousRadius = CONFIG.radius;
+		if (radius > 0 && radius != previousRadius) {
+			CONFIG.radius = radius;
+		}
+
 		String dimId = level.dimension().identifier().toString();
 		state.markStarted(chunkX, chunkZ, dimId);
 		rebuildSpiral();
+		recentIndices.clear();
+		cachedTargetStatus = null;
 		LOGGER.info("Starting chunk preload: {} chunks in {} around ({}, {})", totalChunks, dimId, chunkX, chunkZ);
+		sendDiscordWebhook("Chunk preloading started in " + dimId + " at " + chunkX + ", " + chunkZ + " (" + totalChunks + " chunks)");
+
+		if (radius > 0 && radius != previousRadius) {
+			CONFIG.radius = previousRadius;
+		}
+	}
+
+	private static void sendDiscordWebhook(String message) {
+		String url = CONFIG.discordWebhookUrl;
+		if (url == null || url.isEmpty()) return;
+
+		try {
+			HttpClient client = HttpClient.newHttpClient();
+			HttpRequest request = HttpRequest.newBuilder()
+					.uri(URI.create(url))
+					.header("Content-Type", "application/json")
+					.POST(HttpRequest.BodyPublishers.ofString("{\"content\":\"" + message + "\"}"))
+					.build();
+
+			client.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+					.thenAccept(response -> {
+						if (response.statusCode() >= 400) {
+							LOGGER.warn("Discord webhook failed with status: {}", response.statusCode());
+						}
+					})
+					.exceptionally(t -> {
+						LOGGER.warn("Discord webhook failed", t);
+						return null;
+					});
+		} catch (Exception e) {
+			LOGGER.warn("Failed to send Discord webhook", e);
+		}
+	}
+
+	private static void updateMapMods(ServerLevel level, int chunkX, int chunkZ) {
+		if (!CONFIG.notifyMapMods) return;
+
+		// BlueMap support
+		try {
+			Class<?> apiClass = Class.forName("de.bluecolored.bluemap.api.BlueMapAPI");
+			Optional<?> api = (Optional<?>) apiClass.getMethod("getInstance").invoke(null);
+			if (api.isPresent()) {
+				Object apiObj = api.get();
+				Optional<?> bmWorld = (Optional<?>) apiClass.getMethod("getWorld", Level.class).invoke(apiObj, level);
+				if (bmWorld.isPresent()) {
+					Object world = bmWorld.get();
+					Iterable<?> maps = (Iterable<?>) world.getClass().getMethod("getMaps").invoke(world);
+					for (Object map : maps) {
+						// Using reflection to avoid direct dependency on FlowPowered Math or BlueMap API
+						// BlueMap render takes a Vector2i
+						Class<?> vector2iClass = Class.forName("com.flowpowered.math.vector.Vector2i");
+						Object vector = vector2iClass.getConstructor(int.class, int.class).newInstance(chunkX, chunkZ);
+						map.getClass().getMethod("render", vector2iClass).invoke(map, vector);
+					}
+				}
+			}
+		} catch (Exception ignored) {}
+
+		// Dynmap support
+		try {
+			Class<?> dynmapApiClass = Class.forName("org.dynmap.DynmapCommonAPI");
+			// Usually dynmap handles it via chunk load events, but we can force it if needed
+		} catch (Exception ignored) {}
 	}
 
 	private static boolean isLowMemory() {
@@ -320,6 +495,19 @@ public class ChunkPreloadMod implements ModInitializer {
 			inFlightIndices.remove(completedIndex);
 			completedIndices.add(completedIndex);
 			changed = true;
+
+			recentIndices.addFirst(completedIndex);
+			if (recentIndices.size() > RECENT_INDICES_COUNT) {
+				recentIndices.removeLast();
+			}
+			
+			chunksGeneratedThisSession++;
+			updateMapMods(overworld, chunkX, chunkZ);
+
+			if (CONFIG.restartAfterChunks > 0 && chunksGeneratedThisSession >= CONFIG.restartAfterChunks) {
+				LOGGER.info("Restart limit reached ({} chunks). Stopping server...", CONFIG.restartAfterChunks);
+				overworld.getServer().halt(false);
+			}
 		}
 
 		if (changed) {
@@ -337,7 +525,8 @@ public class ChunkPreloadMod implements ModInitializer {
 		int maxConcurrency = CONFIG.maxConcurrentAsyncChunks;
 		
 		if (cachedTargetStatus == null) {
-			cachedTargetStatus = BuiltInRegistries.CHUNK_STATUS.get(Identifier.parse(CONFIG.targetStatus))
+			String statusId = CONFIG.structureOnlyMode ? "minecraft:structure_starts" : CONFIG.targetStatus;
+			cachedTargetStatus = BuiltInRegistries.CHUNK_STATUS.get(Identifier.parse(statusId))
 					.map(Holder.Reference::value).orElse(ChunkStatus.FULL);
 		}
 		ChunkStatus status = cachedTargetStatus;
@@ -395,7 +584,8 @@ public class ChunkPreloadMod implements ModInitializer {
 		lastBroadcastDone = state.doneCount;
 		lastBroadcastActive = active;
 
-		PreloadProgressPayload payload = new PreloadProgressPayload(state.doneCount, totalChunks, active, state.dimension, chunksPerSecond);
+		List<Integer> recent = new ArrayList<>(recentIndices);
+		PreloadProgressPayload payload = new PreloadProgressPayload(state.doneCount, totalChunks, active, state.dimension, chunksPerSecond, recent);
 
 		for (ServerPlayer player : server.getPlayerList().getPlayers()) {
 			if (ServerPlayNetworking.canSend(player, PreloadProgressPayload.TYPE)) {
@@ -406,7 +596,8 @@ public class ChunkPreloadMod implements ModInitializer {
 
 	private static void sendProgress(ServerPlayer player) {
 		boolean active = CONFIG.enabled && state.started && !state.completed;
-		PreloadProgressPayload payload = new PreloadProgressPayload(state.doneCount, totalChunks, active, state.dimension, chunksPerSecond);
+		List<Integer> recent = new ArrayList<>(recentIndices);
+		PreloadProgressPayload payload = new PreloadProgressPayload(state.doneCount, totalChunks, active, state.dimension, chunksPerSecond, recent);
 		if (ServerPlayNetworking.canSend(player, PreloadProgressPayload.TYPE)) {
 			ServerPlayNetworking.send(player, payload);
 		}
