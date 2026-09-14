@@ -96,6 +96,20 @@ public class ChunkPreloadConfig {
 	public boolean preloadNether = false;
 	public boolean preloadEnd = false;
 
+	// --- SERVER FRIENDLY OPTIONS ---
+
+	/** If true, preloading only happens when no players are online. */
+	public boolean onlyPreloadWhenEmpty = false;
+
+	/** Log progress to console every N seconds. 0 to disable. */
+	public int consoleLogIntervalSeconds = 30;
+
+	/** If current TPS drops below this, pause generation. */
+	public double minTpsThreshold = 15.0;
+
+	/** Minimum free disk space in MB required to continue preloading. */
+	public long minFreeDiskSpaceMb = 512;
+
 	public static ChunkPreloadConfig load() {
 		Path path = FabricLoader.getInstance().getConfigDir().resolve(FILE_NAME);
 

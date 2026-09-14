@@ -33,8 +33,10 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.io.File;
 
 import net.minecraft.resources.Identifier;
+import net.minecraft.world.level.storage.LevelResource;
 
 public class ChunkPreloadMod implements ModInitializer {
 	public static final String MOD_ID = "chunkpreload";
@@ -50,6 +52,7 @@ public class ChunkPreloadMod implements ModInitializer {
 	private static long lastDoneCount = 0;
 	private static long lastTime = 0;
 	private static float chunksPerSecond = 0;
+	private static long lastConsoleLogTime = 0;
 
 	private static int nextRequestIndex = -1;
 	private static final Set<Integer> inFlightIndices = new HashSet<>();
@@ -203,13 +206,18 @@ public class ChunkPreloadMod implements ModInitializer {
 
 		if (CONFIG.enabled) {
 			updateCps();
+			handleConsoleLogging();
 
-			boolean serverIsBusy = !CONFIG.turboMode && CONFIG.adaptiveThrottling
-					&& server.getAverageTickTimeNanos() > (long) (CONFIG.busyTickThresholdMs * 1_000_000L);
+			boolean tooManyPlayers = CONFIG.onlyPreloadWhenEmpty && server.getPlayerCount() > 0;
+			boolean lowTps = !CONFIG.turboMode && (1000.0 / (server.getAverageTickTimeNanos() / 1_000_000.0)) < CONFIG.minTpsThreshold;
+			boolean lowDisk = isLowDiskSpace(server);
+			
+			boolean serverIsBusy = !CONFIG.turboMode && (CONFIG.adaptiveThrottling
+					&& server.getAverageTickTimeNanos() > (long) (CONFIG.busyTickThresholdMs * 1_000_000L));
 
 			boolean lowMemory = !CONFIG.turboMode && isLowMemory();
 
-			if (!serverIsBusy && !lowMemory) {
+			if (!serverIsBusy && !lowMemory && !tooManyPlayers && !lowTps && !lowDisk) {
 				requestMoreChunks(currentLevel, 32);
 			}
 
@@ -247,6 +255,22 @@ public class ChunkPreloadMod implements ModInitializer {
 			tickCounter = 0;
 			broadcastProgress(server);
 		}
+	}
+
+	private static void handleConsoleLogging() {
+		if (CONFIG.consoleLogIntervalSeconds <= 0) return;
+		long now = System.currentTimeMillis();
+		if (now - lastConsoleLogTime > CONFIG.consoleLogIntervalSeconds * 1000L) {
+			lastConsoleLogTime = now;
+			LOGGER.info(String.format("Pregen Progress: %d/%d chunks (%s) | Speed: %.1f ch/s", 
+					state.doneCount, totalChunks, state.dimension, chunksPerSecond));
+		}
+	}
+
+	private static boolean isLowDiskSpace(MinecraftServer server) {
+		File worldDir = server.getWorldPath(LevelResource.ROOT).toFile();
+		long freeSpaceMb = worldDir.getFreeSpace() / (1024 * 1024);
+		return freeSpaceMb < CONFIG.minFreeDiskSpaceMb;
 	}
 
 	private static ServerLevel getLevelForDimension(MinecraftServer server, String dimension) {
@@ -374,14 +398,18 @@ public class ChunkPreloadMod implements ModInitializer {
 		PreloadProgressPayload payload = new PreloadProgressPayload(state.doneCount, totalChunks, active, state.dimension, chunksPerSecond);
 
 		for (ServerPlayer player : server.getPlayerList().getPlayers()) {
-			ServerPlayNetworking.send(player, payload);
+			if (ServerPlayNetworking.canSend(player, PreloadProgressPayload.TYPE)) {
+				ServerPlayNetworking.send(player, payload);
+			}
 		}
 	}
 
 	private static void sendProgress(ServerPlayer player) {
 		boolean active = CONFIG.enabled && state.started && !state.completed;
 		PreloadProgressPayload payload = new PreloadProgressPayload(state.doneCount, totalChunks, active, state.dimension, chunksPerSecond);
-		ServerPlayNetworking.send(player, payload);
+		if (ServerPlayNetworking.canSend(player, PreloadProgressPayload.TYPE)) {
+			ServerPlayNetworking.send(player, payload);
+		}
 	}
 
 	public static void rebuildSpiral() {

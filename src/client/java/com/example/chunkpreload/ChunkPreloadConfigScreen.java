@@ -156,6 +156,34 @@ public class ChunkPreloadConfigScreen {
 				.build());
 
 		advanced.addEntry(entryBuilder
+				.startBooleanToggle(Component.literal("Only When Empty"), config.onlyPreloadWhenEmpty)
+				.setDefaultValue(false)
+				.setTooltip(Component.literal("Pause generation whenever players are online to avoid lag."))
+				.setSaveConsumer(value -> config.onlyPreloadWhenEmpty = value)
+				.build());
+
+		advanced.addEntry(entryBuilder
+				.startIntSlider(Component.literal("Console Log Interval (s)"), config.consoleLogIntervalSeconds, 0, 300)
+				.setDefaultValue(30)
+				.setTooltip(Component.literal("Log progress to server console every N seconds. 0 to disable."))
+				.setSaveConsumer(value -> config.consoleLogIntervalSeconds = value)
+				.build());
+
+		advanced.addEntry(entryBuilder
+				.startDoubleField(Component.literal("Min TPS Threshold"), config.minTpsThreshold)
+				.setDefaultValue(15.0)
+				.setTooltip(Component.literal("Pause if server TPS drops below this value."))
+				.setSaveConsumer(value -> config.minTpsThreshold = value)
+				.build());
+
+		advanced.addEntry(entryBuilder
+				.startLongField(Component.literal("Min Free Disk (MB)"), config.minFreeDiskSpaceMb)
+				.setDefaultValue(512L)
+				.setTooltip(Component.literal("Pause if free disk space is lower than this."))
+				.setSaveConsumer(value -> config.minFreeDiskSpaceMb = value)
+				.build());
+
+		advanced.addEntry(entryBuilder
 				.startIntSlider(Component.literal("Max ms per tick (Legacy)"), config.maxMillisPerTick, 1, 200)
 				.setDefaultValue(40)
 				.setTooltip(Component.literal("Legacy setting for synchronous loading."))
