@@ -308,16 +308,18 @@ public class ChunkPreloadMod implements ModInitializer {
 			updateCps();
 			handleConsoleLogging();
 
+			boolean lowMemory = isLowMemory();
 			boolean tooManyPlayers = CONFIG.onlyPreloadWhenEmpty && server.getPlayerCount() > 0;
-			boolean lowTps = !CONFIG.turboMode && (1000.0 / (server.getAverageTickTimeNanos() / 1_000_000.0)) < CONFIG.minTpsThreshold;
 			boolean lowDisk = isLowDiskSpace(server);
-			
 			boolean serverIsBusy = !CONFIG.turboMode && (CONFIG.adaptiveThrottling
 					&& server.getAverageTickTimeNanos() > (long) (CONFIG.busyTickThresholdMs * 1_000_000L));
+			boolean lowTps = !CONFIG.turboMode && (1000.0 / (server.getAverageTickTimeNanos() / 1_000_000.0)) < CONFIG.minTpsThreshold;
 
-			boolean lowMemory = !CONFIG.turboMode && isLowMemory();
+			boolean shouldRequestMoreChunks = !lowMemory && (
+					CONFIG.turboMode || (!serverIsBusy && !tooManyPlayers && !lowTps && !lowDisk)
+			);
 
-			if (!serverIsBusy && !lowMemory && !tooManyPlayers && !lowTps && !lowDisk) {
+			if (shouldRequestMoreChunks) {
 				requestMoreChunks(currentLevel, 32);
 			}
 
@@ -522,6 +524,10 @@ public class ChunkPreloadMod implements ModInitializer {
 	}
 
 	private static void requestMoreChunks(ServerLevel overworld, int limit) {
+		if (isLowMemory()) {
+			return;
+		}
+
 		int maxConcurrency = CONFIG.maxConcurrentAsyncChunks;
 		
 		if (cachedTargetStatus == null) {

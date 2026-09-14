@@ -67,7 +67,7 @@ public class ChunkPreloadConfigScreen {
 		general.addEntry(entryBuilder
 				.startBooleanToggle(Component.literal("Turbo Mode"), config.turboMode)
 				.setDefaultValue(false)
-				.setTooltip(Component.literal("BYPASSES all throttling for maximum speed. CAUTION: Will cause lag."))
+				.setTooltip(Component.literal("Bypasses server-load throttles for maximum speed. Memory protection still pauses generation when the heap is too full."))
 				.setSaveConsumer(value -> config.turboMode = value)
 				.build());
 
