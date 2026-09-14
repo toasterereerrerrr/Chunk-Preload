@@ -18,7 +18,8 @@ public class PreloadState extends SavedData {
 			Codec.BOOL.fieldOf("completed").forGetter(s -> s.completed),
 			Codec.INT.fieldOf("centerX").forGetter(s -> s.centerX),
 			Codec.INT.fieldOf("centerZ").forGetter(s -> s.centerZ),
-			Codec.INT.fieldOf("doneCount").forGetter(s -> s.doneCount)
+			Codec.INT.fieldOf("doneCount").forGetter(s -> s.doneCount),
+			Codec.STRING.fieldOf("dimension").orElse("minecraft:overworld").forGetter(s -> s.dimension)
 	).apply(instance, PreloadState::new));
 
 	public static final SavedDataType<PreloadState> TYPE = new SavedDataType<>(
@@ -33,16 +34,18 @@ public class PreloadState extends SavedData {
 	int centerX = 0;
 	int centerZ = 0;
 	int doneCount = 0;
+	String dimension = "minecraft:overworld";
 
 	public PreloadState() {
 	}
 
-	private PreloadState(boolean started, boolean completed, int centerX, int centerZ, int doneCount) {
+	private PreloadState(boolean started, boolean completed, int centerX, int centerZ, int doneCount, String dimension) {
 		this.started = started;
 		this.completed = completed;
 		this.centerX = centerX;
 		this.centerZ = centerZ;
 		this.doneCount = doneCount;
+		this.dimension = dimension;
 	}
 
 	public static PreloadState get(MinecraftServer server) {
@@ -55,11 +58,12 @@ public class PreloadState extends SavedData {
 		return overworld.getDataStorage().computeIfAbsent(TYPE);
 	}
 
-	public void markStarted(int chunkX, int chunkZ) {
+	public void markStarted(int chunkX, int chunkZ, String dimension) {
 		this.started = true;
 		this.centerX = chunkX;
 		this.centerZ = chunkZ;
 		this.doneCount = 0;
+		this.dimension = dimension;
 		setDirty();
 	}
 

@@ -25,8 +25,11 @@ public class ChunkPreloadClient implements ClientModInitializer {
 	private static int done = 0;
 	private static int total = 0;
 	private static boolean active = false;
+	private static String dimension = "minecraft:overworld";
 	private static long completedAtMillis = -1;
 	private static long worldJoinTime = -1;
+	private static long startTime = -1;
+	private static int startDone = 0;
 
 	private static final int HIDE_AFTER_MILLIS = 3000;
 	private static final int C2ME_MSG_DURATION_MILLIS = 10000;
@@ -49,11 +52,17 @@ public class ChunkPreloadClient implements ClientModInitializer {
 			done = payload.done();
 			total = payload.total();
 			active = payload.active();
+			dimension = payload.dimension();
 
 			if (total > 0 && done < total) {
 				completedAtMillis = -1;
+				if (startTime < 0 && active) {
+					startTime = System.currentTimeMillis();
+					startDone = done;
+				}
 			} else if (total > 0 && done >= total && completedAtMillis < 0) {
 				completedAtMillis = System.currentTimeMillis();
+				startTime = -1;
 			}
 		});
 
@@ -86,7 +95,7 @@ public class ChunkPreloadClient implements ClientModInitializer {
 
 	private static void render(GuiGraphicsExtractor graphics, DeltaTracker deltaTracker) {
 		boolean recentlyCompleted = completedAtMillis > 0 && System.currentTimeMillis() - completedAtMillis <= HIDE_AFTER_MILLIS;
-		boolean showC2MEMessage = C2ME_INSTALLED && worldJoinTime > 0 && (System.currentTimeMillis() - worldJoinTime) < C2ME_MSG_DURATION_MILLIS;
+		boolean showC2MEMessage = C2ME_INSTALLED && ChunkPreloadMod.CONFIG.showStatusMessages && worldJoinTime > 0 && (System.currentTimeMillis() - worldJoinTime) < C2ME_MSG_DURATION_MILLIS;
 
 		if (!showC2MEMessage && ((!active && !recentlyCompleted) || total <= 0 || !ChunkPreloadMod.CONFIG.showHud)) {
 			return;
@@ -108,9 +117,18 @@ public class ChunkPreloadClient implements ClientModInitializer {
 			currentY += font.lineHeight + 2;
 		}
 
-		// 2. Render Progress or Done status
+		// 2. Render Turbo Mode warning
+		if (active && ChunkPreloadMod.CONFIG.turboMode) {
+			String turboLabel = "TURBO MODE ACTIVE - UNLIMITED POWER";
+			int turboWidth = font.width(turboLabel);
+			int turboX = screenWidth - turboWidth - margin;
+			graphics.text(font, turboLabel, turboX, currentY, ARGB.opaque(0xFF5555), true);
+			currentY += font.lineHeight + 2;
+		}
+
+		// 3. Render Progress or Done status
 		if (done >= total && total > 0) {
-			if (recentlyCompleted) {
+			if (recentlyCompleted && ChunkPreloadMod.CONFIG.showStatusMessages) {
 				String label = "Done loading";
 				int labelWidth = font.width(label);
 				int labelX = screenWidth - labelWidth - margin;
@@ -119,7 +137,7 @@ public class ChunkPreloadClient implements ClientModInitializer {
 			return;
 		}
 
-		if (!active || total <= 0) return;
+		if (!active || total <= 0 || !ChunkPreloadMod.CONFIG.showHud) return;
 
 		int barWidth = 160;
 		int barHeight = 6;
@@ -127,7 +145,22 @@ public class ChunkPreloadClient implements ClientModInitializer {
 		float progress = Math.min(1f, (float) done / (float) total);
 		int percent = (int) (progress * 100f);
 
-		String label = "Preloading chunks: " + done + " / " + total + " (" + percent + "%)";
+		// ETA Calculation
+		String etaStr = "";
+		if (startTime > 0 && done > startDone) {
+			long elapsed = System.currentTimeMillis() - startTime;
+			double chunksPerMs = (double) (done - startDone) / elapsed;
+			if (chunksPerMs > 0) {
+				long remaining = (long) ((total - done) / chunksPerMs);
+				int sec = (int) (remaining / 1000) % 60;
+				int min = (int) (remaining / 60000);
+				etaStr = String.format(" | ETA: %dm %ds", min, sec);
+			}
+		}
+
+		String dimStr = dimension.replace("minecraft:", "");
+		String shapeStr = ChunkPreloadMod.CONFIG.shape.toString().toLowerCase();
+		String label = String.format("Preloading %s (%s): %d/%d (%d%%)%s", dimStr, shapeStr, done, total, percent, etaStr);
 		int labelWidth = font.width(label);
 
 		int labelX = screenWidth - Math.max(labelWidth, barWidth) - margin;
@@ -140,5 +173,12 @@ public class ChunkPreloadClient implements ClientModInitializer {
 		int filledWidth = (int) (barWidth * progress);
 		graphics.fill(barX, barY, barX + filledWidth, barY + barHeight, ARGB.opaque(0x55CC55));
 		graphics.outline(barX, barY, barWidth, barHeight, ARGB.opaque(0xFFFFFF));
+
+		// Memory usage indicator
+		Runtime r = Runtime.getRuntime();
+		double mem = (double) (r.totalMemory() - r.freeMemory()) / r.maxMemory();
+		String memStr = String.format("Memory: %d%%", (int)(mem * 100));
+		int memColor = mem > 0.9 ? 0xFF5555 : (mem > 0.7 ? 0xFFFF55 : 0x55FF55);
+		graphics.text(font, memStr, screenWidth - font.width(memStr) - margin, barY + barHeight + 2, ARGB.opaque(memColor), true);
 	}
 }

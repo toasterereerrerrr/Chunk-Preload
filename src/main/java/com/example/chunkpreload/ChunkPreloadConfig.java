@@ -42,6 +42,12 @@ public class ChunkPreloadConfig {
 	 */
 	public double memoryUsageThreshold = 0.90;
 
+	/**
+	 * If true, generation ignores all throttling thresholds and runs at maximum possible speed.
+	 * May cause significant lag and high memory usage.
+	 */
+	public boolean turboMode = false;
+
 	/** Roughly how many milliseconds per server tick may be spent generating chunks. */
 	public int maxMillisPerTick = 40;
    /**
@@ -65,6 +71,24 @@ public class ChunkPreloadConfig {
 	public int maxConcurrentAsyncChunks = 32;
    
    public boolean showHud = true;
+   public boolean showStatusMessages = true;
+
+	// --- NEW FEATURES ---
+
+	public enum Shape {
+		CIRCLE, SQUARE
+	}
+
+	public Shape shape = Shape.CIRCLE;
+
+	/** If not empty, this command will be executed when preloading finishes. */
+	public String onCompleteCommand = "";
+
+	/** Target chunk status. "full" is default. "features" or "liquid_carvers" are faster. */
+	public String targetStatus = "minecraft:full";
+
+	public boolean preloadNether = false;
+	public boolean preloadEnd = false;
 
 	public static ChunkPreloadConfig load() {
 		Path path = FabricLoader.getInstance().getConfigDir().resolve(FILE_NAME);

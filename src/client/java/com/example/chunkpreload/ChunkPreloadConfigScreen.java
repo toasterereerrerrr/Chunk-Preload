@@ -62,52 +62,94 @@ public class ChunkPreloadConfigScreen {
 				})
 				.build());
 
-		// --- ADVANCED CATEGORY ---
-
-		advanced.addEntry(entryBuilder
-				.startBooleanToggle(Component.literal("Smart throttle"), config.adaptiveThrottling)
-				.setDefaultValue(true)
-				.setTooltip(Component.literal(
-						"Automatically pauses generation if the server is already busy."))
-				.setSaveConsumer(value -> config.adaptiveThrottling = value)
+		general.addEntry(entryBuilder
+				.startBooleanToggle(Component.literal("Turbo Mode"), config.turboMode)
+				.setDefaultValue(false)
+				.setTooltip(Component.literal("BYPASSES all throttling for maximum speed. CAUTION: Will cause lag."))
+				.setSaveConsumer(value -> config.turboMode = value)
 				.build());
 
-		advanced.addEntry(entryBuilder
-				.startDoubleField(Component.literal("Busy tick threshold (ms)"), config.busyTickThresholdMs)
-				.setDefaultValue(45.0)
-				.setTooltip(Component.literal(
-						"The server tick time threshold (in ms) above which generation pauses. " +
-						"Higher = more aggressive, lower = less lag."))
-				.setSaveConsumer(value -> config.busyTickThresholdMs = value)
+		general.addEntry(entryBuilder
+				.startEnumSelector(Component.literal("Shape"), ChunkPreloadConfig.Shape.class, config.shape)
+				.setDefaultValue(ChunkPreloadConfig.Shape.CIRCLE)
+				.setTooltip(Component.literal("CIRCLE generates in a ring, SQUARE generates a full block area."))
+				.setSaveConsumer(value -> config.shape = value)
 				.build());
 
-		advanced.addEntry(entryBuilder
-				.startIntSlider(Component.literal("Memory usage threshold (%)"), (int) (config.memoryUsageThreshold * 100), 10, 99)
-				.setDefaultValue(90)
-				.setTooltip(Component.literal(
-						"Pause generation when JVM memory usage exceeds this percentage to avoid OutOfMemory errors."))
-				.setSaveConsumer(value -> config.memoryUsageThreshold = value / 100.0)
+		general.addEntry(entryBuilder
+				.startBooleanToggle(Component.literal("Preload Nether"), config.preloadNether)
+				.setDefaultValue(false)
+				.setTooltip(Component.literal("Automatically start preloading the Nether after the Overworld is done."))
+				.setSaveConsumer(value -> config.preloadNether = value)
 				.build());
 
-		advanced.addEntry(entryBuilder
-				.startIntField(Component.literal("Max concurrent chunks"), config.maxConcurrentAsyncChunks)
-				.setDefaultValue(32)
-				.setTooltip(Component.literal(
-						"Manual override for the number of chunks requested at once. Overwritten by 'CPU usage' if changed there."))
-				.setSaveConsumer(value -> config.maxConcurrentAsyncChunks = value)
+		general.addEntry(entryBuilder
+				.startBooleanToggle(Component.literal("Preload End"), config.preloadEnd)
+				.setDefaultValue(false)
+				.setTooltip(Component.literal("Automatically start preloading the End after the Nether is done."))
+				.setSaveConsumer(value -> config.preloadEnd = value)
 				.build());
 
-		advanced.addEntry(entryBuilder
+		general.addEntry(entryBuilder
 				.startBooleanToggle(Component.literal("Show progress HUD"), config.showHud)
 				.setDefaultValue(true)
 				.setTooltip(Component.literal("Show/hide the top-right progress bar."))
 				.setSaveConsumer(value -> config.showHud = value)
 				.build());
 
+		general.addEntry(entryBuilder
+				.startBooleanToggle(Component.literal("Show status messages"), config.showStatusMessages)
+				.setDefaultValue(true)
+				.setTooltip(Component.literal("Show/hide the C2ME detection and 'Done loading' messages."))
+				.setSaveConsumer(value -> config.showStatusMessages = value)
+				.build());
+
+		// --- ADVANCED CATEGORY ---
+
+		advanced.addEntry(entryBuilder
+				.startTextField(Component.literal("Target Status"), config.targetStatus)
+				.setTooltip(Component.literal("Status to load chunks to (e.g., 'minecraft:full', 'minecraft:features'). Faster if not 'full'."))
+				.setSaveConsumer(value -> config.targetStatus = value)
+				.build());
+
+		advanced.addEntry(entryBuilder
+				.startTextField(Component.literal("On Complete Command"), config.onCompleteCommand)
+				.setTooltip(Component.literal("Command to run on the server when preloading is fully complete."))
+				.setSaveConsumer(value -> config.onCompleteCommand = value)
+				.build());
+
+		advanced.addEntry(entryBuilder
+				.startIntSlider(Component.literal("Max concurrent chunks"), config.maxConcurrentAsyncChunks, 1, 256)
+				.setDefaultValue(32)
+				.setTooltip(Component.literal("Manual override for the number of chunks requested at once."))
+				.setSaveConsumer(value -> config.maxConcurrentAsyncChunks = value)
+				.build());
+
+		advanced.addEntry(entryBuilder
+				.startBooleanToggle(Component.literal("Smart throttle"), config.adaptiveThrottling)
+				.setDefaultValue(true)
+				.setTooltip(Component.literal("Automatically pauses generation if the server is already busy."))
+				.setSaveConsumer(value -> config.adaptiveThrottling = value)
+				.build());
+
+		advanced.addEntry(entryBuilder
+				.startDoubleField(Component.literal("Busy tick threshold (ms)"), config.busyTickThresholdMs)
+				.setDefaultValue(45.0)
+				.setTooltip(Component.literal("The server tick time threshold (in ms) above which generation pauses."))
+				.setSaveConsumer(value -> config.busyTickThresholdMs = value)
+				.build());
+
+		advanced.addEntry(entryBuilder
+				.startIntSlider(Component.literal("Memory usage threshold (%)"), (int) (config.memoryUsageThreshold * 100), 10, 99)
+				.setDefaultValue(90)
+				.setTooltip(Component.literal("Pause generation when JVM memory usage exceeds this percentage."))
+				.setSaveConsumer(value -> config.memoryUsageThreshold = value / 100.0)
+				.build());
+
 		advanced.addEntry(entryBuilder
 				.startIntSlider(Component.literal("Max ms per tick (Legacy)"), config.maxMillisPerTick, 1, 200)
 				.setDefaultValue(40)
-				.setTooltip(Component.literal("Legacy setting for synchronous loading. Currently unused."))
+				.setTooltip(Component.literal("Legacy setting for synchronous loading."))
 				.setSaveConsumer(value -> config.maxMillisPerTick = value)
 				.build());
 
