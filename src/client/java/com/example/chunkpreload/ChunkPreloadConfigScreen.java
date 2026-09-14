@@ -51,13 +51,15 @@ public class ChunkPreloadConfigScreen {
 				.setDefaultValue(ChunkPreloadConfig.CpuUsageLevel.MEDIUM)
 				.setTooltip(Component.literal(
 						"Controls how aggressively chunks generate. High finishes faster but uses more CPU, " +
-						"Low is gentler on weaker hardware."))
+						"INSANE is for high-end systems."))
 				.setSaveConsumer(value -> {
 					config.cpuUsageLevel = value;
 					config.maxConcurrentAsyncChunks = switch (value) {
 						case LOW -> 8;
 						case MEDIUM -> 32;
 						case HIGH -> 64;
+						case VERY_HIGH -> 128;
+						case INSANE -> 256;
 					};
 				})
 				.build());
@@ -67,6 +69,13 @@ public class ChunkPreloadConfigScreen {
 				.setDefaultValue(false)
 				.setTooltip(Component.literal("BYPASSES all throttling for maximum speed. CAUTION: Will cause lag."))
 				.setSaveConsumer(value -> config.turboMode = value)
+				.build());
+
+		general.addEntry(entryBuilder
+				.startBooleanToggle(Component.literal("Immediate Refill"), config.immediateRefill)
+				.setDefaultValue(true)
+				.setTooltip(Component.literal("Bypasses tick latency by requesting a new chunk as soon as one finishes. FASTEST."))
+				.setSaveConsumer(value -> config.immediateRefill = value)
 				.build());
 
 		general.addEntry(entryBuilder

@@ -26,6 +26,7 @@ public class ChunkPreloadClient implements ClientModInitializer {
 	private static int total = 0;
 	private static boolean active = false;
 	private static String dimension = "minecraft:overworld";
+	private static float chunksPerSecond = 0;
 	private static long completedAtMillis = -1;
 	private static long worldJoinTime = -1;
 	private static long startTime = -1;
@@ -53,6 +54,7 @@ public class ChunkPreloadClient implements ClientModInitializer {
 			total = payload.total();
 			active = payload.active();
 			dimension = payload.dimension();
+			chunksPerSecond = payload.chunksPerSecond();
 
 			if (total > 0 && done < total) {
 				completedAtMillis = -1;
@@ -160,7 +162,7 @@ public class ChunkPreloadClient implements ClientModInitializer {
 
 		String dimStr = dimension.replace("minecraft:", "");
 		String shapeStr = ChunkPreloadMod.CONFIG.shape.toString().toLowerCase();
-		String label = String.format("Preloading %s (%s): %d/%d (%d%%)%s", dimStr, shapeStr, done, total, percent, etaStr);
+		String label = String.format("Preloading %s (%s): %d/%d (%d%%) | %.1f ch/s%s", dimStr, shapeStr, done, total, percent, chunksPerSecond, etaStr);
 		int labelWidth = font.width(label);
 
 		int labelX = screenWidth - Math.max(labelWidth, barWidth) - margin;

@@ -10,7 +10,7 @@ import net.minecraft.resources.Identifier;
  * Sent from server to client with the current preload progress.
  * {@code active} tells the client whether it should be showing the HUD at all.
  */
-public record PreloadProgressPayload(int done, int total, boolean active, String dimension) implements CustomPacketPayload {
+public record PreloadProgressPayload(int done, int total, boolean active, String dimension, float chunksPerSecond) implements CustomPacketPayload {
 	public static final Identifier ID = Identifier.fromNamespaceAndPath(ChunkPreloadMod.MOD_ID, "progress");
 
 	public static final Type<PreloadProgressPayload> TYPE =
@@ -21,6 +21,7 @@ public record PreloadProgressPayload(int done, int total, boolean active, String
 			ByteBufCodecs.INT, PreloadProgressPayload::total,
 			ByteBufCodecs.BOOL, PreloadProgressPayload::active,
 			ByteBufCodecs.STRING_UTF8, PreloadProgressPayload::dimension,
+			ByteBufCodecs.FLOAT, PreloadProgressPayload::chunksPerSecond,
 			PreloadProgressPayload::new
 	);
 

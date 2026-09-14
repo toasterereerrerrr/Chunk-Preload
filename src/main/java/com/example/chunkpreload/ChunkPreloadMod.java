@@ -7,7 +7,6 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
-import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.TicketType;
@@ -33,37 +32,31 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import net.minecraft.resources.Identifier;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 
 public class ChunkPreloadMod implements ModInitializer {
 	public static final String MOD_ID = "chunkpreload";
 	public static final Logger LOGGER = LoggerFactory.getLogger("Chunk Preloader");
 	public static ChunkPreloadConfig CONFIG;
 
-	// Ring-ordered (dx, dz) chunk offsets covering a circle of CONFIG.radius chunks, built once at startup.
 	private static int[] offsetX;
 	private static int[] offsetZ;
 	private static int totalChunks;
 
 	private static PreloadState state;
+	private static ChunkStatus cachedTargetStatus;
+	private static long lastDoneCount = 0;
+	private static long lastTime = 0;
+	private static float chunksPerSecond = 0;
 
-	// Async bookkeeping - only ever touched on the main server thread (async callbacks below
-	// hop back onto it via server.execute before touching any of this).
 	private static int nextRequestIndex = -1;
 	private static final Set<Integer> inFlightIndices = new HashSet<>();
 	private static final Set<Integer> completedIndices = new HashSet<>();
-	// Async completion callbacks can run on a worker thread, or on the main thread at an
-	// unpredictable point (not necessarily safe relative to vanilla's own tick code) - so they
-	// only ever touch this thread-safe queue, never any actual chunk/ticket state directly.
-	// All real mutation happens by draining this at the start of our own tick, a known-safe point.
 	private static final ConcurrentLinkedQueue<Integer> pendingCompletionQueue =
 			new ConcurrentLinkedQueue<>();
+
+	private static MinecraftServer currentServer;
 
 	@Override
 	public void onInitialize() {
@@ -113,6 +106,13 @@ public class ChunkPreloadMod implements ModInitializer {
 								context.getSource().sendSuccess(() -> Component.literal("Turbo Mode: " + (CONFIG.turboMode ? "ON" : "OFF")), true);
 								return 1;
 							}))
+					.then(literal("refill")
+							.executes(context -> {
+								CONFIG.immediateRefill = !CONFIG.immediateRefill;
+								CONFIG.save();
+								context.getSource().sendSuccess(() -> Component.literal("Immediate Refill: " + (CONFIG.immediateRefill ? "ON" : "OFF")), true);
+								return 1;
+							}))
 					.then(literal("status")
 							.executes(context -> {
 								ensureState(context.getSource().getServer());
@@ -144,10 +144,13 @@ public class ChunkPreloadMod implements ModInitializer {
 		});
 
 		ServerTickEvents.END_SERVER_TICK.register(this::onServerTick);
+		ServerTickEvents.START_SERVER_TICK.register(server -> {
+			if (state != null && state.started && !state.completed) {
+				ServerLevel level = getLevelForDimension(server, state.dimension);
+				if (level != null) processCompletions(level);
+			}
+		});
 
-		// A world can be closed and a different one opened without fully quitting the game
-		// (singleplayer especially) - each is its own MinecraftServer instance, so all of
-		// this needs to be reset or it'll incorrectly carry over into the next world.
 		ServerLifecycleEvents.SERVER_STOPPED.register(server -> {
 			state = null;
 			nextRequestIndex = -1;
@@ -161,6 +164,7 @@ public class ChunkPreloadMod implements ModInitializer {
 	}
 
 	private static void ensureState(MinecraftServer server) {
+		currentServer = server;
 		if (state == null) {
 			state = PreloadState.get(server);
 			nextRequestIndex = state.doneCount;
@@ -168,17 +172,9 @@ public class ChunkPreloadMod implements ModInitializer {
 	}
 
 	private static int tickCounter = 0;
-	private static final int BROADCAST_INTERVAL_TICKS = 5; // ~4 updates/sec is plenty for a progress bar
-
+	private static final int BROADCAST_INTERVAL_TICKS = 5;
 	private static int lastBroadcastDone = -1;
 	private static boolean lastBroadcastActive = false;
-
-	private static void startPreload(ServerLevel level, int chunkX, int chunkZ) {
-		String dimId = level.dimension().identifier().toString();
-		state.markStarted(chunkX, chunkZ, dimId);
-		rebuildSpiral();
-		LOGGER.info("Starting chunk preload: {} chunks in {} around ({}, {})", totalChunks, dimId, chunkX, chunkZ);
-	}
 
 	private void onServerTick(MinecraftServer server) {
 		ensureState(server);
@@ -187,16 +183,14 @@ public class ChunkPreloadMod implements ModInitializer {
 			return;
 		}
 
-		Identifier dimId = Identifier.tryParse(state.dimension);
-		if (dimId == null) dimId = Level.OVERWORLD.identifier();
-		
-		ServerLevel currentLevel = server.getLevel(ResourceKey.create(Registries.DIMENSION, dimId));
-
+		ServerLevel currentLevel = getLevelForDimension(server, state.dimension);
 		if (currentLevel == null) return;
 
 		processCompletions(currentLevel);
 
 		if (CONFIG.enabled) {
+			updateCps();
+
 			boolean serverIsBusy = !CONFIG.turboMode && CONFIG.adaptiveThrottling
 					&& server.getAverageTickTimeNanos() > (long) (CONFIG.busyTickThresholdMs * 1_000_000L);
 
@@ -209,7 +203,6 @@ public class ChunkPreloadMod implements ModInitializer {
 			if (state.doneCount >= totalChunks && !state.completed) {
 				LOGGER.info("Chunk preload complete for {}: {} chunks generated", state.dimension, totalChunks);
 				
-				// Check for next dimension
 				boolean startedNext = false;
 				if (state.dimension.equals(Level.OVERWORLD.identifier().toString()) && CONFIG.preloadNether) {
 					ServerLevel next = server.getLevel(Level.NETHER);
@@ -241,6 +234,35 @@ public class ChunkPreloadMod implements ModInitializer {
 			tickCounter = 0;
 			broadcastProgress(server);
 		}
+	}
+
+	private static ServerLevel getLevelForDimension(MinecraftServer server, String dimension) {
+		Identifier dimId = Identifier.tryParse(dimension);
+		if (dimId == null) return server.getLevel(Level.OVERWORLD);
+		return server.getLevel(ResourceKey.create(Registries.DIMENSION, dimId));
+	}
+
+	private static void updateCps() {
+		long now = System.currentTimeMillis();
+		if (lastTime == 0) {
+			lastTime = now;
+			lastDoneCount = state.doneCount;
+			return;
+		}
+
+		long elapsed = now - lastTime;
+		if (elapsed >= 1000) {
+			chunksPerSecond = (float) (state.doneCount - lastDoneCount) * 1000f / elapsed;
+			lastTime = now;
+			lastDoneCount = state.doneCount;
+		}
+	}
+
+	private static void startPreload(ServerLevel level, int chunkX, int chunkZ) {
+		String dimId = level.dimension().identifier().toString();
+		state.markStarted(chunkX, chunkZ, dimId);
+		rebuildSpiral();
+		LOGGER.info("Starting chunk preload: {} chunks in {} around ({}, {})", totalChunks, dimId, chunkX, chunkZ);
 	}
 
 	private static boolean isLowMemory() {
@@ -276,8 +298,12 @@ public class ChunkPreloadMod implements ModInitializer {
 
 	private static void requestMoreChunks(ServerLevel overworld) {
 		int maxConcurrency = CONFIG.maxConcurrentAsyncChunks;
-		ChunkStatus status = BuiltInRegistries.CHUNK_STATUS.get(Identifier.parse(CONFIG.targetStatus))
-				.map(Holder.Reference::value).orElse(ChunkStatus.FULL);
+		
+		if (cachedTargetStatus == null) {
+			cachedTargetStatus = BuiltInRegistries.CHUNK_STATUS.get(Identifier.parse(CONFIG.targetStatus))
+					.map(Holder.Reference::value).orElse(ChunkStatus.FULL);
+		}
+		ChunkStatus status = cachedTargetStatus;
 
 		while (inFlightIndices.size() < maxConcurrency && nextRequestIndex < totalChunks) {
 			int index = nextRequestIndex++;
@@ -292,26 +318,35 @@ public class ChunkPreloadMod implements ModInitializer {
 
 			inFlightIndices.add(index);
 
-			// Add ticket to keep it loaded
 			overworld.getChunkSource().addTicketWithRadius(TicketType.FORCED, chunkPos, 0);
 			
-			// Load to target status
 			overworld.getChunkSource().getChunkFuture(chunkPos.x(), chunkPos.z(), status, true)
 					.whenComplete((result, throwable) -> {
 						if (throwable != null) {
 							LOGGER.warn("Async preload of chunk ({}, {}) failed", chunkPos.x(), chunkPos.z(), throwable);
 						}
 						pendingCompletionQueue.add(index);
+
+						if (CONFIG.immediateRefill && currentServer != null && inFlightIndices.size() < maxConcurrency) {
+							currentServer.execute(() -> {
+								if (state != null && state.started && !state.completed) {
+									ServerLevel level = getLevelForDimension(currentServer, state.dimension);
+									if (level != null) {
+										processCompletions(level);
+										if (!isLowMemory()) {
+											requestMoreChunks(level);
+										}
+									}
+								}
+							});
+						}
 					});
 		}
 	}
 
-
-
 	private static void broadcastProgress(MinecraftServer server) {
 		boolean active = CONFIG.enabled && state.started && !state.completed;
 
-		// Skip the round of packets entirely if nothing has changed since the last one sent.
 		if (state.doneCount == lastBroadcastDone && active == lastBroadcastActive) {
 			return;
 		}
@@ -319,7 +354,7 @@ public class ChunkPreloadMod implements ModInitializer {
 		lastBroadcastDone = state.doneCount;
 		lastBroadcastActive = active;
 
-		PreloadProgressPayload payload = new PreloadProgressPayload(state.doneCount, totalChunks, active, state.dimension);
+		PreloadProgressPayload payload = new PreloadProgressPayload(state.doneCount, totalChunks, active, state.dimension, chunksPerSecond);
 
 		for (ServerPlayer player : server.getPlayerList().getPlayers()) {
 			ServerPlayNetworking.send(player, payload);
@@ -328,25 +363,14 @@ public class ChunkPreloadMod implements ModInitializer {
 
 	private static void sendProgress(ServerPlayer player) {
 		boolean active = CONFIG.enabled && state.started && !state.completed;
-		PreloadProgressPayload payload = new PreloadProgressPayload(state.doneCount, totalChunks, active, state.dimension);
+		PreloadProgressPayload payload = new PreloadProgressPayload(state.doneCount, totalChunks, active, state.dimension, chunksPerSecond);
 		ServerPlayNetworking.send(player, payload);
 	}
 
-	/**
-	 * Rebuilds the ring-ordered offsets from the current CONFIG.radius.
-	 * Call this after changing CONFIG.radius at runtime (e.g. from the settings
-	 * screen) so a world that hasn't started preloading yet picks up the new value
-	 * without needing a full game restart.
-	 */
 	public static void rebuildSpiral() {
 		buildSpiral(CONFIG.radius);
 	}
 
-	/**
-	 * Builds ring-ordered (dx, dz) offsets for every chunk within {@code radius} chunks
-	 * of the origin, filtered to a circle. Ring order makes the preload visibly expand
-	 * outward from the center rather than filling in an arbitrary order.
-	 */
 	private static void buildSpiral(int radius) {
 		int side = 2 * radius + 1;
 		int maxCells = side * side;

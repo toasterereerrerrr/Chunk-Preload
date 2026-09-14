@@ -55,7 +55,7 @@ public class ChunkPreloadConfig {
 	 * Higher finishes faster but adds more simultaneous CPU load; lower is gentler on weaker hardware.
 	*/
 	public enum CpuUsageLevel {
-		LOW, MEDIUM, HIGH
+		LOW, MEDIUM, HIGH, VERY_HIGH, INSANE
 	}
 
 	/**
@@ -69,6 +69,12 @@ public class ChunkPreloadConfig {
 	 * Higher finishes faster but adds more simultaneous CPU load.
 	 */
 	public int maxConcurrentAsyncChunks = 32;
+
+	/**
+	 * If true, when a chunk finishes loading, another is immediately requested
+	 * instead of waiting for the next server tick.
+	 */
+	public boolean immediateRefill = true;
    
    public boolean showHud = true;
    public boolean showStatusMessages = true;
