@@ -1,5 +1,6 @@
 package com.example.chunkpreload;
 
+import com.mojang.brigadier.arguments.IntegerArgumentType;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
@@ -7,53 +8,49 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
-import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.level.ServerLevel;
-import net.minecraft.server.level.TicketType;
+import net.minecraft.commands.arguments.coordinates.ColumnPosArgument;
 import net.minecraft.core.BlockPos;
-import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.level.ChunkPos;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import net.minecraft.resources.ResourceKey;
+import net.minecraft.core.Holder;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.network.chat.Component;
-import net.minecraft.core.Holder;
+import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ColumnPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.level.TicketType;
 import net.minecraft.server.permissions.Permissions;
-
-import static net.minecraft.commands.Commands.literal;
-import static net.minecraft.commands.Commands.argument;
-import com.mojang.brigadier.arguments.IntegerArgumentType;
-
-import net.minecraft.world.level.border.WorldBorder;
-import net.minecraft.commands.arguments.coordinates.ColumnPosArgument;
 import net.minecraft.world.level.ChunkPos;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.ArrayList;
-import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.net.URI;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Locale;
-import java.util.Set;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.atomic.AtomicBoolean;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.border.WorldBorder;
+import net.minecraft.world.level.chunk.status.ChunkStatus;
+import net.minecraft.world.level.storage.LevelResource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.File;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-import net.minecraft.server.level.ColumnPos;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Locale;
+import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicBoolean;
 
-import net.minecraft.resources.Identifier;
-import net.minecraft.world.level.storage.LevelResource;
+import static net.minecraft.commands.Commands.argument;
+import static net.minecraft.commands.Commands.literal;
 
 public class ChunkPreloadMod implements ModInitializer {
 	public static final String MOD_ID = "chunkpreload";
@@ -74,10 +71,9 @@ public class ChunkPreloadMod implements ModInitializer {
 	private static final int RECENT_INDICES_COUNT = 100;
 	private static final LinkedList<Integer> recentIndices = new LinkedList<>();
 	private static int chunksGeneratedThisSession = 0;
-	private static long benchmarkStartTime = 0;
-	private static boolean isBenchmarking = false;
 
 	private static int nextRequestIndex = -1;
+	private static final List<Integer> priorityQueue = new ArrayList<>();
 	private static final Set<Integer> inFlightIndices = new HashSet<>();
 	private static final Set<Integer> completedIndices = new HashSet<>();
 	private static final ConcurrentLinkedQueue<Integer> pendingCompletionQueue = new ConcurrentLinkedQueue<>();
@@ -170,23 +166,6 @@ public class ChunkPreloadMod implements ModInitializer {
 						ensureState(server);
 						startPreload(level, centerX >> 4, centerZ >> 4);
 						context.getSource().sendSuccess(() -> Component.literal("Started preloading within world border (radius: " + radius + ")"), true);
-						return 1;
-					}));
-
-			root.then(literal("benchmark")
-					.executes(context -> {
-						MinecraftServer server = context.getSource().getServer();
-						ensureState(server);
-						ServerLevel level = context.getSource().getLevel();
-						BlockPos pos = BlockPos.containing(context.getSource().getPosition());
-						isBenchmarking = true;
-						benchmarkStartTime = System.currentTimeMillis();
-						int oldRadius = CONFIG.radius;
-						CONFIG.radius = 5;
-						rebuildSpiral();
-						startPreload(level, pos.getX() >> 4, pos.getZ() >> 4);
-						CONFIG.radius = oldRadius;
-						context.getSource().sendSuccess(() -> Component.literal("Starting 10x10 benchmark..."), true);
 						return 1;
 					}));
 
@@ -293,13 +272,6 @@ public class ChunkPreloadMod implements ModInitializer {
 		ensureState(server);
 
 		if (!state.started || state.completed) {
-			if (isBenchmarking) {
-				long duration = System.currentTimeMillis() - benchmarkStartTime;
-				LOGGER.info("Benchmark complete: 121 chunks generated in {}ms", duration);
-				server.getPlayerList().broadcastSystemMessage(Component.literal("Benchmark complete: 121 chunks in " + duration + "ms"), false);
-				isBenchmarking = false;
-				sendDiscordWebhook("Benchmark complete: 121 chunks in " + duration + "ms");
-			}
 			return;
 		}
 
@@ -415,6 +387,8 @@ public class ChunkPreloadMod implements ModInitializer {
 		String dimId = level.dimension().identifier().toString();
 		state.markStarted(chunkX, chunkZ, dimId);
 		rebuildSpiral();
+		nextRequestIndex = 0;
+		priorityQueue.clear();
 		recentIndices.clear();
 		cachedTargetStatus = null;
 		LOGGER.info("Starting chunk preload: {} chunks in {} around ({}, {})", totalChunks, dimId, chunkX, chunkZ);
@@ -554,6 +528,7 @@ public class ChunkPreloadMod implements ModInitializer {
 		Integer completedIndex;
 		boolean changed = false;
 		while ((completedIndex = pendingCompletionQueue.poll()) != null) {
+			priorityQueue.remove(Integer.valueOf(completedIndex));
 			int chunkX = state.centerX + offsetX[completedIndex];
 			int chunkZ = state.centerZ + offsetZ[completedIndex];
 
@@ -588,6 +563,96 @@ public class ChunkPreloadMod implements ModInitializer {
 		}
 	}
 
+	private static double scoreChunkPriority(int index, ServerPlayer player, double moveX, double moveZ) {
+		int chunkX = state.centerX + offsetX[index];
+		int chunkZ = state.centerZ + offsetZ[index];
+		double worldX = (chunkX << 4) + 8.0;
+		double worldZ = (chunkZ << 4) + 8.0;
+		double dx = worldX - player.getX();
+		double dz = worldZ - player.getZ();
+		double distance = Math.hypot(dx, dz);
+		double travelled = dx * moveX + dz * moveZ;
+		return distance - Math.max(travelled, 0.0) * 3.0;
+	}
+
+	private static void rebuildPriorityQueue(ServerLevel overworld) {
+		priorityQueue.clear();
+		if (!CONFIG.routeAwarePreloading || totalChunks <= 0) {
+			for (int i = nextRequestIndex; i < totalChunks; i++) {
+				if (!completedIndices.contains(i) && !inFlightIndices.contains(i)) {
+					priorityQueue.add(i);
+				}
+			}
+			return;
+		}
+
+		ServerPlayer player = null;
+		for (ServerPlayer candidate : overworld.getServer().getPlayerList().getPlayers()) {
+			if (candidate.level() == overworld) {
+				player = candidate;
+				break;
+			}
+		}
+		if (player == null) {
+			for (int i = nextRequestIndex; i < totalChunks; i++) {
+				if (!completedIndices.contains(i) && !inFlightIndices.contains(i)) {
+					priorityQueue.add(i);
+				}
+			}
+			return;
+		}
+
+		double moveX = player.getDeltaMovement().x;
+		double moveZ = player.getDeltaMovement().z;
+		double magnitude = Math.hypot(moveX, moveZ);
+		if (magnitude < 0.01) {
+			float yaw = player.getYRot();
+			moveX = -Math.sin(Math.toRadians(yaw));
+			moveZ = Math.cos(Math.toRadians(yaw));
+			magnitude = Math.hypot(moveX, moveZ);
+		}
+		if (magnitude > 0.0) {
+			moveX /= magnitude;
+			moveZ /= magnitude;
+		}
+
+		List<Integer> candidates = new ArrayList<>();
+		for (int i = 0; i < totalChunks; i++) {
+			if (!completedIndices.contains(i) && !inFlightIndices.contains(i)) {
+				candidates.add(i);
+			}
+		}
+		final ServerPlayer priorityPlayer = player;
+		final double priorityMoveX = moveX;
+		final double priorityMoveZ = moveZ;
+		candidates.sort((a, b) -> Double.compare(scoreChunkPriority(a, priorityPlayer, priorityMoveX, priorityMoveZ), scoreChunkPriority(b, priorityPlayer, priorityMoveX, priorityMoveZ)));
+		priorityQueue.addAll(candidates);
+	}
+
+	private static int nextQueuedIndex(ServerLevel overworld) {
+		if (priorityQueue.isEmpty()) {
+			rebuildPriorityQueue(overworld);
+		}
+		while (!priorityQueue.isEmpty()) {
+			int index = priorityQueue.remove(0);
+			if (!completedIndices.contains(index) && !inFlightIndices.contains(index)) {
+				return index;
+			}
+		}
+		while (nextRequestIndex < totalChunks) {
+			int index = nextRequestIndex++;
+			if (!completedIndices.contains(index) && !inFlightIndices.contains(index)) {
+				return index;
+			}
+		}
+		for (int i = 0; i < totalChunks; i++) {
+			if (!completedIndices.contains(i) && !inFlightIndices.contains(i)) {
+				return i;
+			}
+		}
+		return -1;
+	}
+
 	private static void requestMoreChunks(ServerLevel overworld, int limit) {
 		if (isLowMemory()) {
 			return;
@@ -603,13 +668,12 @@ public class ChunkPreloadMod implements ModInitializer {
 		ChunkStatus status = cachedTargetStatus;
 
 		int requested = 0;
-		while (inFlightIndices.size() < maxConcurrency && nextRequestIndex < totalChunks && requested < limit) {
-			int index = nextRequestIndex++;
-			requested++;
-
-			if (completedIndices.contains(index)) {
-				continue;
+		while (inFlightIndices.size() < maxConcurrency && requested < limit) {
+			int index = nextQueuedIndex(overworld);
+			if (index < 0) {
+				break;
 			}
+			requested++;
 
 			int chunkX = state.centerX + offsetX[index];
 			int chunkZ = state.centerZ + offsetZ[index];

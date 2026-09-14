@@ -29,6 +29,8 @@ public class ChunkPreloadConfig {
 	 * already running slow, instead of adding more load on top of an already-busy server.
    */
 	public boolean adaptiveThrottling = true;
+	/** If true, preloading prefers chunks ahead of the player's travel direction instead of blindly filling the whole spiral. */
+	public boolean routeAwarePreloading = true;
 
 	/**
 	 * The average tick time threshold (in milliseconds) above which the preloader
@@ -48,14 +50,11 @@ public class ChunkPreloadConfig {
 	 */
 	public boolean turboMode = false;
 
-	/** Roughly how many milliseconds per server tick may be spent generating chunks. */
-	public int maxMillisPerTick = 40;
-   /**
+	/**
 	 * How many chunks may be requested concurrently through the async pipeline at once.
 	 * Higher finishes faster but adds more simultaneous CPU load; lower is gentler on weaker hardware.
-	*/
-	public enum CpuUsageLevel {
-		LOW, MEDIUM, HIGH, VERY_HIGH, INSANE
+	 */
+	public enum CpuUsageLevel {		LOW, MEDIUM, HIGH, VERY_HIGH, INSANE
 	}
 
 	/**
@@ -78,6 +77,8 @@ public class ChunkPreloadConfig {
    
    public boolean showHud = true;
    public boolean showStatusMessages = true;
+   public boolean showAdvancedDebugHud = false;
+   public boolean advancedDebugHudOnRight = true;
 
 	// --- NEW FEATURES ---
 
@@ -117,7 +118,6 @@ public class ChunkPreloadConfig {
 	public int restartAfterChunks = 0; // 0 to disable
 	public boolean useWorldBorder = false;
 	public boolean structureOnlyMode = false;
-	public boolean showHeatmap = false;
 
 	public static ChunkPreloadConfig load() {
 		Path path = FabricLoader.getInstance().getConfigDir().resolve(FILE_NAME);

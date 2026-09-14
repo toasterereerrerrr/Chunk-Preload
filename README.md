@@ -6,4 +6,4 @@ For setup instructions, please see the [Fabric Documentation page](https://docs.
 
 ## License
 
-This template is available under the CC0 license. Feel free to learn from it and incorporate it in your own projects.
+This project is licensed under ARR (All Rights Reserved). All rights are reserved by the author and no redistribution, modification, or commercial use is permitted without explicit written permission.

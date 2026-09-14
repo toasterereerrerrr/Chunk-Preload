@@ -113,7 +113,28 @@ public class ChunkPreloadConfigScreen {
 				.setSaveConsumer(value -> config.showStatusMessages = value)
 				.build());
 
+		general.addEntry(entryBuilder
+				.startBooleanToggle(Component.literal("Route-aware preloading"), config.routeAwarePreloading)
+				.setDefaultValue(true)
+				.setTooltip(Component.literal("Prioritize chunks ahead of the player instead of filling the full spiral in a fixed order."))
+				.setSaveConsumer(value -> config.routeAwarePreloading = value)
+				.build());
+
 		// --- ADVANCED CATEGORY ---
+
+		advanced.addEntry(entryBuilder
+				.startBooleanToggle(Component.literal("Show advanced debug HUD"), config.showAdvancedDebugHud)
+				.setDefaultValue(false)
+				.setTooltip(Component.literal("Displays extra status info such as memory and generation speed. Toggle to keep the main HUD clean."))
+				.setSaveConsumer(value -> config.showAdvancedDebugHud = value)
+				.build());
+
+		advanced.addEntry(entryBuilder
+				.startBooleanToggle(Component.literal("Advanced HUD on right"), config.advancedDebugHudOnRight)
+				.setDefaultValue(true)
+				.setTooltip(Component.literal("Places the advanced overlay on the top-right side when enabled; otherwise it appears on the left."))
+				.setSaveConsumer(value -> config.advancedDebugHudOnRight = value)
+				.build());
 
 		advanced.addEntry(entryBuilder
 				.startTextField(Component.literal("Target Status"), config.targetStatus)
@@ -190,13 +211,6 @@ public class ChunkPreloadConfigScreen {
 				.build());
 
 		advanced.addEntry(entryBuilder
-				.startBooleanToggle(Component.literal("Show Heatmap"), config.showHeatmap)
-				.setDefaultValue(false)
-				.setTooltip(Component.literal("Show a visual 2D grid of generation progress on the HUD."))
-				.setSaveConsumer(value -> config.showHeatmap = value)
-				.build());
-
-		advanced.addEntry(entryBuilder
 				.startIntSlider(Component.literal("Console Log Interval (s)"), config.consoleLogIntervalSeconds, 0, 300)
 				.setDefaultValue(30)
 				.setTooltip(Component.literal("Log progress to server console every N seconds. 0 to disable."))
@@ -215,13 +229,6 @@ public class ChunkPreloadConfigScreen {
 				.setDefaultValue(512L)
 				.setTooltip(Component.literal("Pause if free disk space is lower than this."))
 				.setSaveConsumer(value -> config.minFreeDiskSpaceMb = value)
-				.build());
-
-		advanced.addEntry(entryBuilder
-				.startIntSlider(Component.literal("Max ms per tick (Legacy)"), config.maxMillisPerTick, 1, 200)
-				.setDefaultValue(40)
-				.setTooltip(Component.literal("Legacy setting for synchronous loading."))
-				.setSaveConsumer(value -> config.maxMillisPerTick = value)
 				.build());
 
 		return builder.build();

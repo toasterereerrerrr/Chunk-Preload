@@ -9,17 +9,13 @@ import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements;
 import net.fabricmc.loader.api.FabricLoader;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.ARGB;
-import net.minecraft.resources.Identifier;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class ChunkPreloadClient implements ClientModInitializer {
 	private static int done = 0;
@@ -109,6 +105,8 @@ public class ChunkPreloadClient implements ClientModInitializer {
 		int screenWidth = client.getWindow().getGuiScaledWidth();
 		int margin = 6;
 		int currentY = margin;
+		boolean advancedHudEnabled = ChunkPreloadMod.CONFIG.showAdvancedDebugHud && active && total > 0;
+		boolean advancedHudOnRight = ChunkPreloadMod.CONFIG.advancedDebugHudOnRight;
 
 		// 1. Render C2ME Message if applicable
 		if (showC2MEMessage) {
@@ -119,7 +117,18 @@ public class ChunkPreloadClient implements ClientModInitializer {
 			currentY += font.lineHeight + 2;
 		}
 
-		// 2. Render Turbo Mode warning
+		// 2. Render advanced debug HUD when enabled
+		if (advancedHudEnabled) {
+			Runtime r = Runtime.getRuntime();
+			double mem = (double) (r.totalMemory() - r.freeMemory()) / r.maxMemory();
+			String debugLabel = String.format("Debug: %d/%d | %.1f ch/s | Mem %d%%", done, total, chunksPerSecond, (int) (mem * 100));
+			int debugWidth = font.width(debugLabel);
+			int debugX = advancedHudOnRight ? screenWidth - debugWidth - margin : margin;
+			graphics.text(font, debugLabel, debugX, currentY, ARGB.opaque(0xB0B0B0), true);
+			currentY += font.lineHeight + 2;
+		}
+
+		// 3. Render Turbo Mode warning
 		if (active && ChunkPreloadMod.CONFIG.turboMode) {
 			String turboLabel = "Turbo Mode";
 			int turboWidth = font.width(turboLabel);
