@@ -121,7 +121,7 @@ public class ChunkPreloadClient implements ClientModInitializer {
 
 		// 2. Render Turbo Mode warning
 		if (active && ChunkPreloadMod.CONFIG.turboMode) {
-			String turboLabel = "TURBO MODE ACTIVE - UNLIMITED POWER";
+			String turboLabel = "Turbo Mode";
 			int turboWidth = font.width(turboLabel);
 			int turboX = screenWidth - turboWidth - margin;
 			graphics.text(font, turboLabel, turboX, currentY, ARGB.opaque(0xFF5555), true);

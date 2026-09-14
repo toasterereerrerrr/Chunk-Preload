@@ -32,6 +32,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import net.minecraft.resources.Identifier;
 
@@ -53,8 +54,8 @@ public class ChunkPreloadMod implements ModInitializer {
 	private static int nextRequestIndex = -1;
 	private static final Set<Integer> inFlightIndices = new HashSet<>();
 	private static final Set<Integer> completedIndices = new HashSet<>();
-	private static final ConcurrentLinkedQueue<Integer> pendingCompletionQueue =
-			new ConcurrentLinkedQueue<>();
+	private static final ConcurrentLinkedQueue<Integer> pendingCompletionQueue = new ConcurrentLinkedQueue<>();
+	private static final AtomicBoolean refillTaskPending = new AtomicBoolean(false);
 
 	private static MinecraftServer currentServer;
 
@@ -121,7 +122,8 @@ public class ChunkPreloadMod implements ModInitializer {
 								} else if (state.completed) {
 									context.getSource().sendSuccess(() -> Component.literal("Completed: " + state.doneCount + "/" + totalChunks), false);
 								} else {
-									context.getSource().sendSuccess(() -> Component.literal("Progress: " + state.doneCount + "/" + totalChunks + " (Turbo: " + CONFIG.turboMode + ", Dim: " + state.dimension + ")"), false);
+									context.getSource().sendSuccess(() -> Component.literal(String.format("Progress: %d/%d (Turbo: %b, Dim: %s, Speed: %.1f ch/s)", 
+											state.doneCount, totalChunks, CONFIG.turboMode, state.dimension, chunksPerSecond)), false);
 								}
 								return 1;
 							}))
@@ -151,6 +153,15 @@ public class ChunkPreloadMod implements ModInitializer {
 			}
 		});
 
+		ServerLifecycleEvents.SERVER_STOPPING.register(server -> {
+			state = null;
+			currentServer = null;
+			inFlightIndices.clear();
+			completedIndices.clear();
+			pendingCompletionQueue.clear();
+			refillTaskPending.set(false);
+		});
+
 		ServerLifecycleEvents.SERVER_STOPPED.register(server -> {
 			state = null;
 			nextRequestIndex = -1;
@@ -160,6 +171,8 @@ public class ChunkPreloadMod implements ModInitializer {
 			tickCounter = 0;
 			lastBroadcastDone = -1;
 			lastBroadcastActive = false;
+			refillTaskPending.set(false);
+			currentServer = null;
 		});
 	}
 
@@ -197,28 +210,28 @@ public class ChunkPreloadMod implements ModInitializer {
 			boolean lowMemory = !CONFIG.turboMode && isLowMemory();
 
 			if (!serverIsBusy && !lowMemory) {
-				requestMoreChunks(currentLevel);
+				requestMoreChunks(currentLevel, 32);
 			}
 
 			if (state.doneCount >= totalChunks && !state.completed) {
 				LOGGER.info("Chunk preload complete for {}: {} chunks generated", state.dimension, totalChunks);
 				
-				boolean startedNext = false;
+				boolean nextDimStarted = false;
 				if (state.dimension.equals(Level.OVERWORLD.identifier().toString()) && CONFIG.preloadNether) {
 					ServerLevel next = server.getLevel(Level.NETHER);
 					if (next != null) {
 						startPreload(next, state.centerX, state.centerZ);
-						startedNext = true;
+						nextDimStarted = true;
 					}
 				} else if (state.dimension.equals(Level.NETHER.identifier().toString()) && CONFIG.preloadEnd) {
 					ServerLevel next = server.getLevel(Level.END);
 					if (next != null) {
 						startPreload(next, state.centerX, state.centerZ);
-						startedNext = true;
+						nextDimStarted = true;
 					}
 				}
 
-				if (!startedNext) {
+				if (!nextDimStarted) {
 					state.markCompleted();
 					if (!CONFIG.onCompleteCommand.isEmpty()) {
 						server.getCommands().performPrefixedCommand(server.createCommandSourceStack(), CONFIG.onCompleteCommand);
@@ -296,7 +309,7 @@ public class ChunkPreloadMod implements ModInitializer {
 		}
 	}
 
-	private static void requestMoreChunks(ServerLevel overworld) {
+	private static void requestMoreChunks(ServerLevel overworld, int limit) {
 		int maxConcurrency = CONFIG.maxConcurrentAsyncChunks;
 		
 		if (cachedTargetStatus == null) {
@@ -305,8 +318,10 @@ public class ChunkPreloadMod implements ModInitializer {
 		}
 		ChunkStatus status = cachedTargetStatus;
 
-		while (inFlightIndices.size() < maxConcurrency && nextRequestIndex < totalChunks) {
+		int requested = 0;
+		while (inFlightIndices.size() < maxConcurrency && nextRequestIndex < totalChunks && requested < limit) {
 			int index = nextRequestIndex++;
+			requested++;
 
 			if (completedIndices.contains(index)) {
 				continue;
@@ -327,14 +342,16 @@ public class ChunkPreloadMod implements ModInitializer {
 						}
 						pendingCompletionQueue.add(index);
 
-						if (CONFIG.immediateRefill && currentServer != null && inFlightIndices.size() < maxConcurrency) {
+						if (CONFIG.immediateRefill && currentServer != null && !currentServer.isStopped() && refillTaskPending.compareAndSet(false, true)) {
 							currentServer.execute(() -> {
+								refillTaskPending.set(false);
+								if (currentServer == null || currentServer.isStopped()) return;
 								if (state != null && state.started && !state.completed) {
 									ServerLevel level = getLevelForDimension(currentServer, state.dimension);
 									if (level != null) {
 										processCompletions(level);
 										if (!isLowMemory()) {
-											requestMoreChunks(level);
+											requestMoreChunks(level, 16);
 										}
 									}
 								}
