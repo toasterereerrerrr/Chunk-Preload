@@ -1,0 +1,32 @@
+{
+  "stats": {
+    "minecraft:picked_up": {
+      "minecraft:bee_nest": 1
+    },
+    "minecraft:killed": {
+      "minecraft:rabbit": 4
+    },
+    "minecraft:used": {
+      "minecraft:water_bucket": 52,
+      "minecraft:rabbit_spawn_egg": 36,
+      "minecraft:bee_nest": 1,
+      "minecraft:mace": 7
+    },
+    "minecraft:custom": {
+      "minecraft:time_since_rest": 268,
+      "minecraft:walk_one_cm": 2899,
+      "minecraft:leave_game": 1,
+      "minecraft:mob_kills": 4,
+      "minecraft:play_time": 268,
+      "minecraft:damage_dealt": 216,
+      "minecraft:jump": 83,
+      "minecraft:time_since_death": 268,
+      "minecraft:sprint_one_cm": 3382,
+      "minecraft:total_world_time": 772,
+      "minecraft:fly_one_cm": 151189,
+      "minecraft:walk_on_water_one_cm": 213,
+      "minecraft:sneak_time": 12
+    }
+  },
+  "DataVersion": 4903
+}

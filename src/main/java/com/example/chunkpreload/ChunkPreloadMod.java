@@ -42,10 +42,14 @@ import java.net.http.HttpResponse;
 import java.net.URI;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.io.File;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import net.minecraft.server.level.ColumnPos;
 
 import net.minecraft.resources.Identifier;
@@ -450,7 +454,7 @@ public class ChunkPreloadMod implements ModInitializer {
 
 	private static void updateMapMods(ServerLevel level, int chunkX, int chunkZ) {
 		if (!CONFIG.notifyMapMods) return;
-
+		
 		// BlueMap support
 		try {
 			Class<?> apiClass = Class.forName("de.bluecolored.bluemap.api.BlueMapAPI");
@@ -462,8 +466,6 @@ public class ChunkPreloadMod implements ModInitializer {
 					Object world = bmWorld.get();
 					Iterable<?> maps = (Iterable<?>) world.getClass().getMethod("getMaps").invoke(world);
 					for (Object map : maps) {
-						// Using reflection to avoid direct dependency on FlowPowered Math or BlueMap API
-						// BlueMap render takes a Vector2i
 						Class<?> vector2iClass = Class.forName("com.flowpowered.math.vector.Vector2i");
 						Object vector = vector2iClass.getConstructor(int.class, int.class).newInstance(chunkX, chunkZ);
 						map.getClass().getMethod("render", vector2iClass).invoke(map, vector);
@@ -471,12 +473,75 @@ public class ChunkPreloadMod implements ModInitializer {
 				}
 			}
 		} catch (Exception ignored) {}
-
+		
 		// Dynmap support
 		try {
 			Class<?> dynmapApiClass = Class.forName("org.dynmap.DynmapCommonAPI");
 			// Usually dynmap handles it via chunk load events, but we can force it if needed
 		} catch (Exception ignored) {}
+		
+		// Xaero's Minimap / World Map support
+		tryInvokeMapRefresh(chunkX, chunkZ,
+				"xaero.minimap.XaeroMinimap",
+				"xaero.minimap.api.XaeroMinimapAPI",
+				"xaero.worldmap.XaeroWorldMap",
+				"xaero.map.WorldMap",
+				"xaero.common.minimap.Minimap"
+		);
+	}
+
+	private static void tryInvokeMapRefresh(int chunkX, int chunkZ, String... candidateClassNames) {
+		for (String className : candidateClassNames) {
+			try {
+				Class<?> clazz = Class.forName(className);
+				Object target = findXaeroMapTarget(clazz);
+				if (target == null) {
+					continue;
+				}
+
+				for (Method method : clazz.getMethods()) {
+					String methodName = method.getName().toLowerCase(Locale.ROOT);
+					if (!methodName.contains("refresh") && !methodName.contains("reload") && !methodName.contains("render")
+							&& !methodName.contains("update") && !methodName.contains("redraw") && !methodName.contains("map")) {
+						continue;
+					}
+					try {
+						if (method.getParameterCount() == 0) {
+							method.invoke(target);
+							return;
+						}
+						if (method.getParameterCount() == 2 && method.getParameterTypes()[0] == int.class && method.getParameterTypes()[1] == int.class) {
+							method.invoke(target, chunkX, chunkZ);
+							return;
+						}
+						if (method.getParameterCount() == 1 && method.getParameterTypes()[0] == int.class) {
+							method.invoke(target, chunkX);
+							return;
+						}
+					} catch (Exception ignored) {
+						// Try the next candidate signature rather than failing everything.
+					}
+				}
+			} catch (Exception ignored) {
+				// Xaero may not be installed or may have a different implementation.
+			}
+		}
+	}
+
+	private static Object findXaeroMapTarget(Class<?> clazz) throws Exception {
+		for (Method method : clazz.getMethods()) {
+			if (!Modifier.isStatic(method.getModifiers())) continue;
+			if (method.getName().equals("getInstance") && method.getParameterCount() == 0) {
+				return method.invoke(null);
+			}
+		}
+		for (Field field : clazz.getDeclaredFields()) {
+			if (Modifier.isStatic(field.getModifiers()) && clazz.isAssignableFrom(field.getType())) {
+				field.setAccessible(true);
+				return field.get(null);
+			}
+		}
+		return clazz;
 	}
 
 	private static boolean isLowMemory() {

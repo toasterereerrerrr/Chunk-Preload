@@ -1,0 +1,5 @@
+/enchant Player944 minecraft:wind_burst 3
+/chunkpreload turbo
+/enchant Player742 minecraft:wind_burst 3
+/gamerule keep_inventory true
+/gamemode survival
