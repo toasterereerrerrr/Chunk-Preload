@@ -3,3 +3,14 @@
 /enchant Player742 minecraft:wind_burst 3
 /gamerule keep_inventory true
 /gamemode survival
+/enchant Player874 minecraft:wind_burst 4
+/enchant Player874 minecraft:wind_burst 3
+/gamemode survival
+/give Player874 minecraft:wind_charge 128
+/enchant Player874 minecraft:wind_burst 3
+/gamemode survival
+/gamerule keep_inventory true
+/gamemode creative
+/gamemode survival
+/gamemode creative
+/gamemode survival

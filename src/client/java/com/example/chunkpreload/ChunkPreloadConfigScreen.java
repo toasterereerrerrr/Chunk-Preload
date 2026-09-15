@@ -10,9 +10,6 @@ import net.minecraft.network.chat.Component;
  * Builds the Cloth Config settings screen for Chunk Preloader.
  * Edits {@link ChunkPreloadMod#CONFIG} in place and writes it back to
  * config/chunkpreload.json when the player clicks "Save".
- *
- * Note: changing the radius here only affects worlds that haven't started
- * preloading yet - see the README for how to force-restart an existing world.
  */
 public class ChunkPreloadConfigScreen {
 	public static Screen create(Screen parent) {
@@ -29,6 +26,7 @@ public class ChunkPreloadConfigScreen {
 		ConfigEntryBuilder entryBuilder = builder.entryBuilder();
 		ConfigCategory general = builder.getOrCreateCategory(Component.literal("General"));
 		ConfigCategory advanced = builder.getOrCreateCategory(Component.literal("Advanced"));
+		ConfigCategory integration = builder.getOrCreateCategory(Component.literal("Integration"));
 
 		// --- GENERAL CATEGORY ---
 
@@ -72,13 +70,6 @@ public class ChunkPreloadConfigScreen {
 				.build());
 
 		general.addEntry(entryBuilder
-				.startBooleanToggle(Component.literal("Immediate Refill"), config.immediateRefill)
-				.setDefaultValue(true)
-				.setTooltip(Component.literal("Bypasses tick latency by requesting a new chunk as soon as one finishes. FASTEST."))
-				.setSaveConsumer(value -> config.immediateRefill = value)
-				.build());
-
-		general.addEntry(entryBuilder
 				.startEnumSelector(Component.literal("Shape"), ChunkPreloadConfig.Shape.class, config.shape)
 				.setDefaultValue(ChunkPreloadConfig.Shape.CIRCLE)
 				.setTooltip(Component.literal("CIRCLE generates in a ring, SQUARE generates a full block area."))
@@ -114,38 +105,33 @@ public class ChunkPreloadConfigScreen {
 				.build());
 
 		general.addEntry(entryBuilder
-				.startBooleanToggle(Component.literal("Route-aware preloading"), config.routeAwarePreloading)
-				.setDefaultValue(true)
-				.setTooltip(Component.literal("Prioritize chunks ahead of the player instead of filling the full spiral in a fixed order."))
-				.setSaveConsumer(value -> config.routeAwarePreloading = value)
+				.startBooleanToggle(Component.literal("Show HUD metrics"), config.showHudMetrics)
+				.setDefaultValue(false)
+				.setTooltip(Component.literal("Show memory usage and chunks/second under the normal progress HUD."))
+				.setSaveConsumer(value -> config.showHudMetrics = value)
 				.build());
 
 		// --- ADVANCED CATEGORY ---
 
 		advanced.addEntry(entryBuilder
-				.startBooleanToggle(Component.literal("Show advanced debug HUD"), config.showAdvancedDebugHud)
-				.setDefaultValue(false)
-				.setTooltip(Component.literal("Displays extra status info such as memory and generation speed. Toggle to keep the main HUD clean."))
-				.setSaveConsumer(value -> config.showAdvancedDebugHud = value)
-				.build());
-
-		advanced.addEntry(entryBuilder
-				.startBooleanToggle(Component.literal("Advanced HUD on right"), config.advancedDebugHudOnRight)
-				.setDefaultValue(true)
-				.setTooltip(Component.literal("Places the advanced overlay on the top-right side when enabled; otherwise it appears on the left."))
-				.setSaveConsumer(value -> config.advancedDebugHudOnRight = value)
-				.build());
-
-		advanced.addEntry(entryBuilder
 				.startTextField(Component.literal("Target Status"), config.targetStatus)
+				.setDefaultValue("minecraft:full")
 				.setTooltip(Component.literal("Status to load chunks to (e.g., 'minecraft:full', 'minecraft:features'). Faster if not 'full'."))
 				.setSaveConsumer(value -> config.targetStatus = value)
 				.build());
 
 		advanced.addEntry(entryBuilder
-				.startTextField(Component.literal("On Complete Command"), config.onCompleteCommand)
-				.setTooltip(Component.literal("Command to run on the server when preloading is fully complete."))
-				.setSaveConsumer(value -> config.onCompleteCommand = value)
+				.startBooleanToggle(Component.literal("Route-aware preloading"), config.routeAwarePreloading)
+				.setDefaultValue(false)
+				.setTooltip(Component.literal("Prioritize chunks ahead of the player instead of filling the full spiral in a fixed order. Off by default."))
+				.setSaveConsumer(value -> config.routeAwarePreloading = value)
+				.build());
+
+		advanced.addEntry(entryBuilder
+				.startBooleanToggle(Component.literal("Immediate Refill"), config.immediateRefill)
+				.setDefaultValue(true)
+				.setTooltip(Component.literal("Bypasses tick latency by requesting a new chunk as soon as one finishes. FASTEST."))
+				.setSaveConsumer(value -> config.immediateRefill = value)
 				.build());
 
 		advanced.addEntry(entryBuilder
@@ -184,40 +170,6 @@ public class ChunkPreloadConfigScreen {
 				.build());
 
 		advanced.addEntry(entryBuilder
-				.startTextField(Component.literal("Discord Webhook URL"), config.discordWebhookUrl)
-				.setTooltip(Component.literal("Post progress updates to a Discord channel."))
-				.setSaveConsumer(value -> config.discordWebhookUrl = value)
-				.build());
-
-		advanced.addEntry(entryBuilder
-				.startBooleanToggle(Component.literal("Notify Map Mods"), config.notifyMapMods)
-				.setDefaultValue(true)
-				.setTooltip(Component.literal("Tell BlueMap/Dynmap to render chunks as they are generated."))
-				.setSaveConsumer(value -> config.notifyMapMods = value)
-				.build());
-
-		advanced.addEntry(entryBuilder
-				.startIntField(Component.literal("Restart After (Chunks)"), config.restartAfterChunks)
-				.setDefaultValue(0)
-				.setTooltip(Component.literal("Automatically /stop the server after this many chunks. 0 to disable."))
-				.setSaveConsumer(value -> config.restartAfterChunks = value)
-				.build());
-
-		advanced.addEntry(entryBuilder
-				.startBooleanToggle(Component.literal("Structure Only Mode"), config.structureOnlyMode)
-				.setDefaultValue(false)
-				.setTooltip(Component.literal("Only generate structure data (fastest). Use for mapping structures."))
-				.setSaveConsumer(value -> config.structureOnlyMode = value)
-				.build());
-
-		advanced.addEntry(entryBuilder
-				.startIntSlider(Component.literal("Console Log Interval (s)"), config.consoleLogIntervalSeconds, 0, 300)
-				.setDefaultValue(30)
-				.setTooltip(Component.literal("Log progress to server console every N seconds. 0 to disable."))
-				.setSaveConsumer(value -> config.consoleLogIntervalSeconds = value)
-				.build());
-
-		advanced.addEntry(entryBuilder
 				.startDoubleField(Component.literal("Min TPS Threshold"), config.minTpsThreshold)
 				.setDefaultValue(15.0)
 				.setTooltip(Component.literal("Pause if server TPS drops below this value."))
@@ -229,6 +181,35 @@ public class ChunkPreloadConfigScreen {
 				.setDefaultValue(512L)
 				.setTooltip(Component.literal("Pause if free disk space is lower than this."))
 				.setSaveConsumer(value -> config.minFreeDiskSpaceMb = value)
+				.build());
+
+		// --- INTEGRATION CATEGORY ---
+
+		integration.addEntry(entryBuilder
+				.startTextField(Component.literal("Discord Webhook URL"), config.discordWebhookUrl)
+				.setTooltip(Component.literal("Post progress updates to a Discord channel."))
+				.setSaveConsumer(value -> config.discordWebhookUrl = value)
+				.build());
+
+		integration.addEntry(entryBuilder
+				.startBooleanToggle(Component.literal("Notify Map Mods"), config.notifyMapMods)
+				.setDefaultValue(true)
+				.setTooltip(Component.literal("Tell BlueMap/Dynmap to render chunks as they are generated."))
+				.setSaveConsumer(value -> config.notifyMapMods = value)
+				.build());
+
+		integration.addEntry(entryBuilder
+				.startIntField(Component.literal("Restart After (Chunks)"), config.restartAfterChunks)
+				.setDefaultValue(0)
+				.setTooltip(Component.literal("Automatically /stop the server after this many chunks. 0 to disable."))
+				.setSaveConsumer(value -> config.restartAfterChunks = value)
+				.build());
+
+		integration.addEntry(entryBuilder
+				.startBooleanToggle(Component.literal("Structure Only Mode"), config.structureOnlyMode)
+				.setDefaultValue(false)
+				.setTooltip(Component.literal("Only generate structure data (fastest). Use for mapping structures."))
+				.setSaveConsumer(value -> config.structureOnlyMode = value)
 				.build());
 
 		return builder.build();

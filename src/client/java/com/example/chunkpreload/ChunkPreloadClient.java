@@ -17,12 +17,16 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.ARGB;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class ChunkPreloadClient implements ClientModInitializer {
 	private static int done = 0;
 	private static int total = 0;
 	private static boolean active = false;
 	private static String dimension = "minecraft:overworld";
 	private static float chunksPerSecond = 0;
+	private static List<Integer> recentIndices = new ArrayList<>();
 	private static long completedAtMillis = -1;
 	private static long worldJoinTime = -1;
 	private static long startTime = -1;
@@ -51,6 +55,7 @@ public class ChunkPreloadClient implements ClientModInitializer {
 			active = payload.active();
 			dimension = payload.dimension();
 			chunksPerSecond = payload.chunksPerSecond();
+			recentIndices = payload.recentIndices();
 
 			if (total > 0 && done < total) {
 				completedAtMillis = -1;
@@ -80,6 +85,8 @@ public class ChunkPreloadClient implements ClientModInitializer {
 			done = 0;
 			total = 0;
 			active = false;
+			startTime = -1;
+			recentIndices.clear();
 		});
 
 		ClientTickEvents.END_CLIENT_TICK.register(client -> {
@@ -95,7 +102,8 @@ public class ChunkPreloadClient implements ClientModInitializer {
 		boolean recentlyCompleted = completedAtMillis > 0 && System.currentTimeMillis() - completedAtMillis <= HIDE_AFTER_MILLIS;
 		boolean showC2MEMessage = C2ME_INSTALLED && ChunkPreloadMod.CONFIG.showStatusMessages && worldJoinTime > 0 && (System.currentTimeMillis() - worldJoinTime) < C2ME_MSG_DURATION_MILLIS;
 
-		if (!showC2MEMessage && ((!active && !recentlyCompleted) || total <= 0 || !ChunkPreloadMod.CONFIG.showHud)) {
+		boolean showMainHud = ChunkPreloadMod.CONFIG.showHud;
+		if (!showC2MEMessage && ((!active && !recentlyCompleted) || total <= 0 || !showMainHud)) {
 			return;
 		}
 
@@ -105,8 +113,6 @@ public class ChunkPreloadClient implements ClientModInitializer {
 		int screenWidth = client.getWindow().getGuiScaledWidth();
 		int margin = 6;
 		int currentY = margin;
-		boolean advancedHudEnabled = ChunkPreloadMod.CONFIG.showAdvancedDebugHud && active && total > 0;
-		boolean advancedHudOnRight = ChunkPreloadMod.CONFIG.advancedDebugHudOnRight;
 
 		// 1. Render C2ME Message if applicable
 		if (showC2MEMessage) {
@@ -117,18 +123,7 @@ public class ChunkPreloadClient implements ClientModInitializer {
 			currentY += font.lineHeight + 2;
 		}
 
-		// 2. Render advanced debug HUD when enabled
-		if (advancedHudEnabled) {
-			Runtime r = Runtime.getRuntime();
-			double mem = (double) (r.totalMemory() - r.freeMemory()) / r.maxMemory();
-			String debugLabel = String.format("Debug: %d/%d | %.1f ch/s | Mem %d%%", done, total, chunksPerSecond, (int) (mem * 100));
-			int debugWidth = font.width(debugLabel);
-			int debugX = advancedHudOnRight ? screenWidth - debugWidth - margin : margin;
-			graphics.text(font, debugLabel, debugX, currentY, ARGB.opaque(0xB0B0B0), true);
-			currentY += font.lineHeight + 2;
-		}
-
-		// 3. Render Turbo Mode warning
+		// 2. Render Turbo Mode warning
 		if (active && ChunkPreloadMod.CONFIG.turboMode) {
 			String turboLabel = "Turbo Mode";
 			int turboWidth = font.width(turboLabel);
@@ -148,7 +143,7 @@ public class ChunkPreloadClient implements ClientModInitializer {
 			return;
 		}
 
-		if (!active || total <= 0 || !ChunkPreloadMod.CONFIG.showHud) return;
+		if (!active || total <= 0 || !showMainHud) return;
 
 		int barWidth = 160;
 		int barHeight = 6;
@@ -171,7 +166,13 @@ public class ChunkPreloadClient implements ClientModInitializer {
 
 		String dimStr = dimension.replace("minecraft:", "");
 		String shapeStr = ChunkPreloadMod.CONFIG.shape.toString().toLowerCase();
-		String label = String.format("Preloading %s (%s): %d/%d (%d%%) | %.1f ch/s%s", dimStr, shapeStr, done, total, percent, chunksPerSecond, etaStr);
+		String label;
+		
+		if (ChunkPreloadMod.CONFIG.showHudMetrics) {
+			label = String.format("Preloading %s (%s): %d/%d (%d%%) | %.1f ch/s%s", dimStr, shapeStr, done, total, percent, chunksPerSecond, etaStr);
+		} else {
+			label = String.format("Preloading %s (%s): %d/%d (%d%%)", dimStr, shapeStr, done, total, percent);
+		}
 		int labelWidth = font.width(label);
 
 		int labelX = screenWidth - Math.max(labelWidth, barWidth) - margin;
@@ -185,11 +186,12 @@ public class ChunkPreloadClient implements ClientModInitializer {
 		graphics.fill(barX, barY, barX + filledWidth, barY + barHeight, ARGB.opaque(0x55CC55));
 		graphics.outline(barX, barY, barWidth, barHeight, ARGB.opaque(0xFFFFFF));
 
-		// Memory usage indicator
-		Runtime r = Runtime.getRuntime();
-		double mem = (double) (r.totalMemory() - r.freeMemory()) / r.maxMemory();
-		String memStr = String.format("Memory: %d%%", (int)(mem * 100));
-		int memColor = mem > 0.9 ? 0xFF5555 : (mem > 0.7 ? 0xFFFF55 : 0x55FF55);
-		graphics.text(font, memStr, screenWidth - font.width(memStr) - margin, barY + barHeight + 2, ARGB.opaque(memColor), true);
+		if (ChunkPreloadMod.CONFIG.showHudMetrics) {
+			Runtime r = Runtime.getRuntime();
+			double mem = (double) (r.totalMemory() - r.freeMemory()) / r.maxMemory();
+			String memStr = String.format("Memory: %d%%", (int)(mem * 100));
+			int memColor = mem > 0.9 ? 0xFF5555 : (mem > 0.7 ? 0xFFFF55 : 0x55FF55);
+			graphics.text(font, memStr, screenWidth - font.width(memStr) - margin, barY + barHeight + 2, ARGB.opaque(memColor), true);
+		}
 	}
 }

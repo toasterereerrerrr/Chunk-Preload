@@ -71,6 +71,8 @@ public class ChunkPreloadMod implements ModInitializer {
 	private static final int RECENT_INDICES_COUNT = 100;
 	private static final LinkedList<Integer> recentIndices = new LinkedList<>();
 	private static int chunksGeneratedThisSession = 0;
+	private static long benchmarkStartTime = 0;
+	private static boolean isBenchmarking = false;
 
 	private static int nextRequestIndex = -1;
 	private static final List<Integer> priorityQueue = new ArrayList<>();
@@ -80,6 +82,7 @@ public class ChunkPreloadMod implements ModInitializer {
 	private static final AtomicBoolean refillTaskPending = new AtomicBoolean(false);
 
 	private static MinecraftServer currentServer;
+	private static final HttpClient HTTP_CLIENT = HttpClient.newHttpClient();
 
 	@Override
 	public void onInitialize() {
@@ -169,6 +172,24 @@ public class ChunkPreloadMod implements ModInitializer {
 						return 1;
 					}));
 
+			root.then(literal("benchmark")
+					.executes(context -> {
+						MinecraftServer server = context.getSource().getServer();
+						ensureState(server);
+						ServerLevel level = context.getSource().getLevel();
+						BlockPos pos = BlockPos.containing(context.getSource().getPosition());
+						
+						isBenchmarking = true;
+						benchmarkStartTime = System.currentTimeMillis();
+						
+						int oldRadius = CONFIG.radius;
+						startPreload(level, pos.getX() >> 4, pos.getZ() >> 4, 5);
+						
+						CONFIG.radius = oldRadius;
+						context.getSource().sendSuccess(() -> Component.literal("Starting 10x10 benchmark..."), true);
+						return 1;
+					}));
+
 			root.then(literal("stop")
 					.executes(context -> {
 						ensureState(context.getSource().getServer());
@@ -224,7 +245,6 @@ public class ChunkPreloadMod implements ModInitializer {
 			sendProgress(player);
 		});
 
-		ServerTickEvents.END_SERVER_TICK.register(this::onServerTick);
 		ServerTickEvents.START_SERVER_TICK.register(server -> {
 			if (state != null && state.started && !state.completed) {
 				ServerLevel level = getLevelForDimension(server, state.dimension);
@@ -232,27 +252,31 @@ public class ChunkPreloadMod implements ModInitializer {
 			}
 		});
 
+		ServerTickEvents.END_SERVER_TICK.register(this::onServerTick);
+
 		ServerLifecycleEvents.SERVER_STOPPING.register(server -> {
-			state = null;
+			stopAllPreloading();
 			currentServer = null;
-			inFlightIndices.clear();
-			completedIndices.clear();
-			pendingCompletionQueue.clear();
-			refillTaskPending.set(false);
 		});
 
 		ServerLifecycleEvents.SERVER_STOPPED.register(server -> {
-			state = null;
-			nextRequestIndex = -1;
-			inFlightIndices.clear();
-			completedIndices.clear();
-			pendingCompletionQueue.clear();
-			tickCounter = 0;
-			lastBroadcastDone = -1;
-			lastBroadcastActive = false;
-			refillTaskPending.set(false);
+			stopAllPreloading();
 			currentServer = null;
 		});
+	}
+
+	private static void stopAllPreloading() {
+		state = null;
+		nextRequestIndex = -1;
+		inFlightIndices.clear();
+		completedIndices.clear();
+		pendingCompletionQueue.clear();
+		priorityQueue.clear();
+		recentIndices.clear();
+		tickCounter = 0;
+		lastBroadcastDone = -1;
+		lastBroadcastActive = false;
+		refillTaskPending.set(false);
 	}
 
 	private static void ensureState(MinecraftServer server) {
@@ -272,6 +296,13 @@ public class ChunkPreloadMod implements ModInitializer {
 		ensureState(server);
 
 		if (!state.started || state.completed) {
+			if (isBenchmarking) {
+				long duration = System.currentTimeMillis() - benchmarkStartTime;
+				LOGGER.info("Benchmark complete: 121 chunks generated in {}ms", duration);
+				server.getPlayerList().broadcastSystemMessage(Component.literal("Benchmark complete: 121 chunks in " + duration + "ms"), false);
+				isBenchmarking = false;
+				sendDiscordWebhook("Benchmark complete: 121 chunks in " + duration + "ms");
+			}
 			return;
 		}
 
@@ -291,12 +322,10 @@ public class ChunkPreloadMod implements ModInitializer {
 					&& server.getAverageTickTimeNanos() > (long) (CONFIG.busyTickThresholdMs * 1_000_000L));
 			boolean lowTps = !CONFIG.turboMode && (1000.0 / (server.getAverageTickTimeNanos() / 1_000_000.0)) < CONFIG.minTpsThreshold;
 
-			boolean shouldRequestMoreChunks = !lowMemory && (
-					CONFIG.turboMode || (!serverIsBusy && !tooManyPlayers && !lowTps && !lowDisk)
-			);
+			boolean canRequestMore = !lowMemory && (CONFIG.turboMode || (!serverIsBusy && !tooManyPlayers && !lowTps && !lowDisk));
 
-			if (shouldRequestMoreChunks) {
-				requestMoreChunks(currentLevel, 32);
+			if (canRequestMore) {
+				requestMoreChunks(currentLevel, 64);
 			}
 
 			if (state.doneCount >= totalChunks && !state.completed) {
@@ -390,6 +419,11 @@ public class ChunkPreloadMod implements ModInitializer {
 		nextRequestIndex = 0;
 		priorityQueue.clear();
 		recentIndices.clear();
+		inFlightIndices.clear();
+		completedIndices.clear();
+		pendingCompletionQueue.clear();
+		chunksGeneratedThisSession = 0;
+		refillTaskPending.set(false);
 		cachedTargetStatus = null;
 		LOGGER.info("Starting chunk preload: {} chunks in {} around ({}, {})", totalChunks, dimId, chunkX, chunkZ);
 		sendDiscordWebhook("Chunk preloading started in " + dimId + " at " + chunkX + ", " + chunkZ + " (" + totalChunks + " chunks)");
@@ -404,14 +438,13 @@ public class ChunkPreloadMod implements ModInitializer {
 		if (url == null || url.isEmpty()) return;
 
 		try {
-			HttpClient client = HttpClient.newHttpClient();
 			HttpRequest request = HttpRequest.newBuilder()
 					.uri(URI.create(url))
 					.header("Content-Type", "application/json")
 					.POST(HttpRequest.BodyPublishers.ofString("{\"content\":\"" + message + "\"}"))
 					.build();
 
-			client.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+			HTTP_CLIENT.sendAsync(request, HttpResponse.BodyHandlers.ofString())
 					.thenAccept(response -> {
 						if (response.statusCode() >= 400) {
 							LOGGER.warn("Discord webhook failed with status: {}", response.statusCode());
@@ -451,7 +484,6 @@ public class ChunkPreloadMod implements ModInitializer {
 		// Dynmap support
 		try {
 			Class<?> dynmapApiClass = Class.forName("org.dynmap.DynmapCommonAPI");
-			// Usually dynmap handles it via chunk load events, but we can force it if needed
 		} catch (Exception ignored) {}
 		
 		// Xaero's Minimap / World Map support
@@ -469,9 +501,7 @@ public class ChunkPreloadMod implements ModInitializer {
 			try {
 				Class<?> clazz = Class.forName(className);
 				Object target = findXaeroMapTarget(clazz);
-				if (target == null) {
-					continue;
-				}
+				if (target == null) continue;
 
 				for (Method method : clazz.getMethods()) {
 					String methodName = method.getName().toLowerCase(Locale.ROOT);
@@ -492,13 +522,9 @@ public class ChunkPreloadMod implements ModInitializer {
 							method.invoke(target, chunkX);
 							return;
 						}
-					} catch (Exception ignored) {
-						// Try the next candidate signature rather than failing everything.
-					}
+					} catch (Exception ignored) {}
 				}
-			} catch (Exception ignored) {
-				// Xaero may not be installed or may have a different implementation.
-			}
+			} catch (Exception ignored) {}
 		}
 	}
 
@@ -528,36 +554,34 @@ public class ChunkPreloadMod implements ModInitializer {
 		Integer completedIndex;
 		boolean changed = false;
 		while ((completedIndex = pendingCompletionQueue.poll()) != null) {
-			priorityQueue.remove(Integer.valueOf(completedIndex));
+			if (completedIndex < 0 || completedIndex >= totalChunks) continue;
+			
 			int chunkX = state.centerX + offsetX[completedIndex];
 			int chunkZ = state.centerZ + offsetZ[completedIndex];
 
 			overworld.getChunkSource().removeTicketWithRadius(TicketType.FORCED, new ChunkPos(chunkX, chunkZ), 0);
 
-			inFlightIndices.remove(completedIndex);
-			completedIndices.add(completedIndex);
-			changed = true;
+			if (inFlightIndices.remove(completedIndex)) {
+				completedIndices.add(completedIndex);
+				changed = true;
+				recentIndices.addFirst(completedIndex);
+				if (recentIndices.size() > RECENT_INDICES_COUNT) {
+					recentIndices.removeLast();
+				}
+				chunksGeneratedThisSession++;
+				updateMapMods(overworld, chunkX, chunkZ);
 
-			recentIndices.addFirst(completedIndex);
-			if (recentIndices.size() > RECENT_INDICES_COUNT) {
-				recentIndices.removeLast();
-			}
-			
-			chunksGeneratedThisSession++;
-			updateMapMods(overworld, chunkX, chunkZ);
-
-			if (CONFIG.restartAfterChunks > 0 && chunksGeneratedThisSession >= CONFIG.restartAfterChunks) {
-				LOGGER.info("Restart limit reached ({} chunks). Stopping server...", CONFIG.restartAfterChunks);
-				overworld.getServer().halt(false);
+				if (CONFIG.restartAfterChunks > 0 && chunksGeneratedThisSession >= CONFIG.restartAfterChunks) {
+					LOGGER.info("Restart limit reached ({} chunks). Stopping server...", CONFIG.restartAfterChunks);
+					overworld.getServer().halt(false);
+				}
 			}
 		}
 
 		if (changed) {
-			int startDoneCount = state.doneCount;
-			while (completedIndices.remove(state.doneCount)) {
-				state.doneCount++;
-			}
-			if (state.doneCount != startDoneCount) {
+			int newDoneCount = Math.min(completedIndices.size(), totalChunks);
+			if (state.doneCount != newDoneCount) {
+				state.doneCount = newDoneCount;
 				state.setDirty();
 			}
 		}
@@ -578,7 +602,7 @@ public class ChunkPreloadMod implements ModInitializer {
 	private static void rebuildPriorityQueue(ServerLevel overworld) {
 		priorityQueue.clear();
 		if (!CONFIG.routeAwarePreloading || totalChunks <= 0) {
-			for (int i = nextRequestIndex; i < totalChunks; i++) {
+			for (int i = 0; i < totalChunks; i++) {
 				if (!completedIndices.contains(i) && !inFlightIndices.contains(i)) {
 					priorityQueue.add(i);
 				}
@@ -593,8 +617,9 @@ public class ChunkPreloadMod implements ModInitializer {
 				break;
 			}
 		}
+		
 		if (player == null) {
-			for (int i = nextRequestIndex; i < totalChunks; i++) {
+			for (int i = 0; i < totalChunks; i++) {
 				if (!completedIndices.contains(i) && !inFlightIndices.contains(i)) {
 					priorityQueue.add(i);
 				}
@@ -639,24 +664,11 @@ public class ChunkPreloadMod implements ModInitializer {
 				return index;
 			}
 		}
-		while (nextRequestIndex < totalChunks) {
-			int index = nextRequestIndex++;
-			if (!completedIndices.contains(index) && !inFlightIndices.contains(index)) {
-				return index;
-			}
-		}
-		for (int i = 0; i < totalChunks; i++) {
-			if (!completedIndices.contains(i) && !inFlightIndices.contains(i)) {
-				return i;
-			}
-		}
 		return -1;
 	}
 
 	private static void requestMoreChunks(ServerLevel overworld, int limit) {
-		if (isLowMemory()) {
-			return;
-		}
+		if (currentServer == null || currentServer.isStopped() || isLowMemory()) return;
 
 		int maxConcurrency = CONFIG.maxConcurrentAsyncChunks;
 		
@@ -670,17 +682,14 @@ public class ChunkPreloadMod implements ModInitializer {
 		int requested = 0;
 		while (inFlightIndices.size() < maxConcurrency && requested < limit) {
 			int index = nextQueuedIndex(overworld);
-			if (index < 0) {
-				break;
-			}
+			if (index < 0) break;
+			
 			requested++;
-
 			int chunkX = state.centerX + offsetX[index];
 			int chunkZ = state.centerZ + offsetZ[index];
 			ChunkPos chunkPos = new ChunkPos(chunkX, chunkZ);
 
 			inFlightIndices.add(index);
-
 			overworld.getChunkSource().addTicketWithRadius(TicketType.FORCED, chunkPos, 0);
 			
 			overworld.getChunkSource().getChunkFuture(chunkPos.x(), chunkPos.z(), status, true)
@@ -698,9 +707,7 @@ public class ChunkPreloadMod implements ModInitializer {
 									ServerLevel level = getLevelForDimension(currentServer, state.dimension);
 									if (level != null) {
 										processCompletions(level);
-										if (!isLowMemory()) {
-											requestMoreChunks(level, 16);
-										}
+										requestMoreChunks(level, 16);
 									}
 								}
 							});
@@ -710,26 +717,26 @@ public class ChunkPreloadMod implements ModInitializer {
 	}
 
 	private static void broadcastProgress(MinecraftServer server) {
-		boolean active = CONFIG.enabled && state.started && !state.completed;
+		boolean active = CONFIG.enabled && state != null && state.started && !state.completed;
 
-		if (state.doneCount == lastBroadcastDone && active == lastBroadcastActive) {
-			return;
-		}
+		if (state != null && state.doneCount == lastBroadcastDone && active == lastBroadcastActive) return;
 
-		lastBroadcastDone = state.doneCount;
-		lastBroadcastActive = active;
+		if (state != null) {
+			lastBroadcastDone = state.doneCount;
+			lastBroadcastActive = active;
+			List<Integer> recent = new ArrayList<>(recentIndices);
+			PreloadProgressPayload payload = new PreloadProgressPayload(state.doneCount, totalChunks, active, state.dimension, chunksPerSecond, recent);
 
-		List<Integer> recent = new ArrayList<>(recentIndices);
-		PreloadProgressPayload payload = new PreloadProgressPayload(state.doneCount, totalChunks, active, state.dimension, chunksPerSecond, recent);
-
-		for (ServerPlayer player : server.getPlayerList().getPlayers()) {
-			if (ServerPlayNetworking.canSend(player, PreloadProgressPayload.TYPE)) {
-				ServerPlayNetworking.send(player, payload);
+			for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+				if (ServerPlayNetworking.canSend(player, PreloadProgressPayload.TYPE)) {
+					ServerPlayNetworking.send(player, payload);
+				}
 			}
 		}
 	}
 
 	private static void sendProgress(ServerPlayer player) {
+		if (state == null) return;
 		boolean active = CONFIG.enabled && state.started && !state.completed;
 		List<Integer> recent = new ArrayList<>(recentIndices);
 		PreloadProgressPayload payload = new PreloadProgressPayload(state.doneCount, totalChunks, active, state.dimension, chunksPerSecond, recent);
@@ -761,22 +768,17 @@ public class ChunkPreloadMod implements ModInitializer {
 					tmpX[count] = dx;
 					tmpZ[count] = -r;
 					count++;
-				}
-				if (inShape) {
 					tmpX[count] = dx;
 					tmpZ[count] = r;
 					count++;
 				}
 			}
-
 			for (int dz = -r + 1; dz <= r - 1; dz++) {
 				boolean inShape = (CONFIG.shape == ChunkPreloadConfig.Shape.SQUARE) || ((long) r * r + (long) dz * dz <= radiusSquared);
 				if (inShape) {
 					tmpX[count] = -r;
 					tmpZ[count] = dz;
 					count++;
-				}
-				if (inShape) {
 					tmpX[count] = r;
 					tmpZ[count] = dz;
 					count++;

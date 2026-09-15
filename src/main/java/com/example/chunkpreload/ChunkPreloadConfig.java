@@ -20,17 +20,17 @@ public class ChunkPreloadConfig {
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 	private static final String FILE_NAME = "chunkpreload.json";
 
-	/** Radius, in chunks, to preload around the first player's spawn point. */
+	/** Radius, in chunks, to preload around the starting point. */
 	public int radius = 100;
-   /** If false, chunk preloading and its HUD are switched off entirely - the mod does nothing. */
+
+	/** If false, chunk preloading and its HUD are disabled entirely. */
 	public boolean enabled = true;
-   /**
-	 * If true, generation automatically backs off during ticks where the server is
-	 * already running slow, instead of adding more load on top of an already-busy server.
-   */
+
+	/** If true, the server backs off when ticks are already slow. */
 	public boolean adaptiveThrottling = true;
-	/** If true, preloading prefers chunks ahead of the player's travel direction instead of blindly filling the whole spiral. */
-	public boolean routeAwarePreloading = true;
+
+	/** If true, chunks ahead of the player's movement are prioritized. */
+	public boolean routeAwarePreloading = false;
 
 	/**
 	 * The average tick time threshold (in milliseconds) above which the preloader
@@ -54,7 +54,8 @@ public class ChunkPreloadConfig {
 	 * How many chunks may be requested concurrently through the async pipeline at once.
 	 * Higher finishes faster but adds more simultaneous CPU load; lower is gentler on weaker hardware.
 	 */
-	public enum CpuUsageLevel {		LOW, MEDIUM, HIGH, VERY_HIGH, INSANE
+	public enum CpuUsageLevel {
+		LOW, MEDIUM, HIGH, VERY_HIGH, INSANE
 	}
 
 	/**
@@ -74,11 +75,10 @@ public class ChunkPreloadConfig {
 	 * instead of waiting for the next server tick.
 	 */
 	public boolean immediateRefill = true;
-   
-   public boolean showHud = true;
-   public boolean showStatusMessages = true;
-   public boolean showAdvancedDebugHud = false;
-   public boolean advancedDebugHudOnRight = true;
+
+	public boolean showHud = true;
+	public boolean showStatusMessages = true;
+	public boolean showHudMetrics = false;
 
 	// --- NEW FEATURES ---
 
