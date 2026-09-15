@@ -1,0 +1,49 @@
+{
+  "stats": {
+    "minecraft:killed": {
+      "minecraft:fox": 1,
+      "minecraft:cow": 47
+    },
+    "minecraft:mined": {
+      "minecraft:spruce_leaves": 2
+    },
+    "minecraft:picked_up": {
+      "minecraft:wind_charge": 52,
+      "minecraft:enchanted_golden_apple": 64,
+      "minecraft:cow_spawn_egg": 187,
+      "minecraft:mace": 1,
+      "minecraft:leather": 9,
+      "minecraft:beef": 25
+    },
+    "minecraft:used": {
+      "minecraft:wind_charge": 134,
+      "minecraft:cow_spawn_egg": 61,
+      "minecraft:enchanted_golden_apple": 4,
+      "minecraft:mace": 72
+    },
+    "minecraft:dropped": {
+      "minecraft:beef": 17
+    },
+    "minecraft:custom": {
+      "minecraft:damage_resisted": 358,
+      "minecraft:time_since_rest": 31,
+      "minecraft:walk_one_cm": 17116,
+      "minecraft:leave_game": 1,
+      "minecraft:mob_kills": 49,
+      "minecraft:damage_taken": 2302,
+      "minecraft:damage_dealt": 4845,
+      "minecraft:play_time": 12101,
+      "minecraft:damage_absorbed": 640,
+      "minecraft:jump": 203,
+      "minecraft:time_since_death": 9,
+      "minecraft:drop": 4,
+      "minecraft:sprint_one_cm": 7158,
+      "minecraft:fall_one_cm": 149054,
+      "minecraft:total_world_time": 12119,
+      "minecraft:fly_one_cm": 45992,
+      "minecraft:sneak_time": 12,
+      "minecraft:deaths": 6
+    }
+  },
+  "DataVersion": 4903
+}
