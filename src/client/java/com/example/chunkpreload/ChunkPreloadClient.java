@@ -36,6 +36,12 @@ public class ChunkPreloadClient implements ClientModInitializer {
 	private static final int C2ME_MSG_DURATION_MILLIS = 10000;
 	private static final boolean C2ME_INSTALLED = FabricLoader.getInstance().isModLoaded("c2me");
 
+	// Cache for HUD strings to avoid constant allocations and formatting.
+	private static String cachedLabel = "";
+	private static int cachedLabelWidth = 0;
+	private static String cachedEtaStr = "";
+	private static long lastHudUpdateTime = 0;
+
 	private static final KeyMapping.Category CATEGORY = KeyMapping.Category.register(
 			Identifier.fromNamespaceAndPath(ChunkPreloadMod.MOD_ID, "category")
 	);
@@ -67,6 +73,8 @@ public class ChunkPreloadClient implements ClientModInitializer {
 				completedAtMillis = System.currentTimeMillis();
 				startTime = -1;
 			}
+			
+			updateCachedStrings();
 		});
 
 		HudElementRegistry.attachElementBefore(
@@ -87,6 +95,7 @@ public class ChunkPreloadClient implements ClientModInitializer {
 			active = false;
 			startTime = -1;
 			recentIndices.clear();
+			cachedLabel = "";
 		});
 
 		ClientTickEvents.END_CLIENT_TICK.register(client -> {
@@ -96,6 +105,38 @@ public class ChunkPreloadClient implements ClientModInitializer {
 				}
 			}
 		});
+	}
+
+	private static void updateCachedStrings() {
+		Minecraft client = Minecraft.getInstance();
+		Font font = client.font;
+		if (font == null) return;
+
+		// Update ETA
+		cachedEtaStr = "";
+		if (startTime > 0 && done > startDone) {
+			long elapsed = System.currentTimeMillis() - startTime;
+			double chunksPerMs = (double) (done - startDone) / elapsed;
+			if (chunksPerMs > 0) {
+				long remaining = (long) ((total - done) / chunksPerMs);
+				int sec = (int) (remaining / 1000) % 60;
+				int min = (int) (remaining / 60000);
+				cachedEtaStr = String.format(" | ETA: %dm %ds", min, sec);
+			}
+		}
+
+		String dimStr = dimension.replace("minecraft:", "");
+		String shapeStr = ChunkPreloadMod.CONFIG.shape.toString().toLowerCase();
+		int percent = (total > 0) ? (int) (((float) done / total) * 100f) : 0;
+
+		if (ChunkPreloadMod.CONFIG.showHudMetrics) {
+			cachedLabel = String.format("Preloading %s (%s): %d/%d (%d%%) | %.1f ch/s%s", 
+					dimStr, shapeStr, done, total, percent, chunksPerSecond, cachedEtaStr);
+		} else {
+			cachedLabel = String.format("Preloading %s (%s): %d/%d (%d%%)", 
+					dimStr, shapeStr, done, total, percent);
+		}
+		cachedLabelWidth = font.width(cachedLabel);
 	}
 
 	private static void render(GuiGraphicsExtractor graphics, DeltaTracker deltaTracker) {
@@ -145,42 +186,21 @@ public class ChunkPreloadClient implements ClientModInitializer {
 
 		if (!active || total <= 0 || !showMainHud) return;
 
+		// Update strings every 1 second if active to keep ETA fresh
+		if (System.currentTimeMillis() - lastHudUpdateTime > 1000) {
+			updateCachedStrings();
+			lastHudUpdateTime = System.currentTimeMillis();
+		}
+
 		int barWidth = 160;
+		int labelX = screenWidth - Math.max(cachedLabelWidth, barWidth) - margin;
+		int barX = screenWidth - Math.max(cachedLabelWidth, barWidth) - margin;
+		int barY = currentY + font.lineHeight + 2;
 		int barHeight = 6;
 
+		graphics.text(font, cachedLabel, labelX, currentY, ARGB.opaque(0xFFFFFF), true);
+
 		float progress = Math.min(1f, (float) done / (float) total);
-		int percent = (int) (progress * 100f);
-
-		// ETA Calculation
-		String etaStr = "";
-		if (startTime > 0 && done > startDone) {
-			long elapsed = System.currentTimeMillis() - startTime;
-			double chunksPerMs = (double) (done - startDone) / elapsed;
-			if (chunksPerMs > 0) {
-				long remaining = (long) ((total - done) / chunksPerMs);
-				int sec = (int) (remaining / 1000) % 60;
-				int min = (int) (remaining / 60000);
-				etaStr = String.format(" | ETA: %dm %ds", min, sec);
-			}
-		}
-
-		String dimStr = dimension.replace("minecraft:", "");
-		String shapeStr = ChunkPreloadMod.CONFIG.shape.toString().toLowerCase();
-		String label;
-		
-		if (ChunkPreloadMod.CONFIG.showHudMetrics) {
-			label = String.format("Preloading %s (%s): %d/%d (%d%%) | %.1f ch/s%s", dimStr, shapeStr, done, total, percent, chunksPerSecond, etaStr);
-		} else {
-			label = String.format("Preloading %s (%s): %d/%d (%d%%)", dimStr, shapeStr, done, total, percent);
-		}
-		int labelWidth = font.width(label);
-
-		int labelX = screenWidth - Math.max(labelWidth, barWidth) - margin;
-		int barX = screenWidth - Math.max(labelWidth, barWidth) - margin;
-		int barY = currentY + font.lineHeight + 2;
-
-		graphics.text(font, label, labelX, currentY, ARGB.opaque(0xFFFFFF), true);
-
 		graphics.fill(barX, barY, barX + barWidth, barY + barHeight, ARGB.opaque(0x333333));
 		int filledWidth = (int) (barWidth * progress);
 		graphics.fill(barX, barY, barX + filledWidth, barY + barHeight, ARGB.opaque(0x55CC55));

@@ -38,14 +38,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Locale;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -57,8 +50,9 @@ public class ChunkPreloadMod implements ModInitializer {
 	public static final Logger LOGGER = LoggerFactory.getLogger("Chunk Preloader");
 	public static ChunkPreloadConfig CONFIG;
 
-	private static int[] offsetX;
-	private static int[] offsetZ;
+	// Optimization: Use short for offsets to save 50% RAM. Radius 2000 fits easily in ±32767.
+	private static short[] offsetX;
+	private static short[] offsetZ;
 	private static int totalChunks;
 
 	private static PreloadState state;
@@ -75,14 +69,15 @@ public class ChunkPreloadMod implements ModInitializer {
 	private static boolean isBenchmarking = false;
 
 	private static int nextRequestIndex = -1;
-	private static final List<Integer> priorityQueue = new ArrayList<>();
+	// priorityQueue is now a Deque to support O(1) removals from the front.
+	private static final Deque<Integer> priorityQueue = new ArrayDeque<>();
 	private static final Set<Integer> inFlightIndices = new HashSet<>();
 	private static final Set<Integer> completedIndices = new HashSet<>();
 	private static final ConcurrentLinkedQueue<Integer> pendingCompletionQueue = new ConcurrentLinkedQueue<>();
 	private static final AtomicBoolean refillTaskPending = new AtomicBoolean(false);
 
 	private static MinecraftServer currentServer;
-	private static final HttpClient HTTP_CLIENT = HttpClient.newHttpClient();
+	private static final HttpClient HTTP_CLIENT = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NORMAL).build();
 
 	@Override
 	public void onInitialize() {
@@ -105,18 +100,19 @@ public class ChunkPreloadMod implements ModInitializer {
 						context.getSource().sendSuccess(() -> Component.literal("Started preloading around your position"), true);
 						return 1;
 					});
-			startCommand.then(argument("x", IntegerArgumentType.integer())
-					.then(argument("z", IntegerArgumentType.integer())
-							.executes(context -> {
-								int x = IntegerArgumentType.getInteger(context, "x");
-								int z = IntegerArgumentType.getInteger(context, "z");
-								MinecraftServer server = context.getSource().getServer();
-								ensureState(server);
-								ServerLevel level = context.getSource().getLevel();
-								startPreload(level, x >> 4, z >> 4);
-								context.getSource().sendSuccess(() -> Component.literal("Started preloading around " + x + ", " + z), true);
-								return 1;
-							})));
+
+			startCommand.then(argument("radius", IntegerArgumentType.integer(1))
+					.executes(context -> {
+						int r = IntegerArgumentType.getInteger(context, "radius");
+						MinecraftServer server = context.getSource().getServer();
+						ensureState(server);
+						ServerLevel level = context.getSource().getLevel();
+						BlockPos pos = BlockPos.containing(context.getSource().getPosition());
+						startPreload(level, pos.getX() >> 4, pos.getZ() >> 4, r);
+						context.getSource().sendSuccess(() -> Component.literal("Started preloading with radius " + r), true);
+						return 1;
+					}));
+
 			startCommand.then(argument("pos", ColumnPosArgument.columnPos())
 					.executes(context -> {
 						ColumnPos pos = ColumnPosArgument.getColumnPos(context, "pos");
@@ -127,31 +123,7 @@ public class ChunkPreloadMod implements ModInitializer {
 						context.getSource().sendSuccess(() -> Component.literal("Started preloading around " + pos.x() + ", " + pos.z()), true);
 						return 1;
 					}));
-			var radiusStartCommand = argument("radius", IntegerArgumentType.integer(1))
-					.executes(context -> {
-						int r = IntegerArgumentType.getInteger(context, "radius");
-						MinecraftServer server = context.getSource().getServer();
-						ensureState(server);
-						ServerLevel level = context.getSource().getLevel();
-						BlockPos pos = BlockPos.containing(context.getSource().getPosition());
-						startPreload(level, pos.getX() >> 4, pos.getZ() >> 4, r);
-						context.getSource().sendSuccess(() -> Component.literal("Started preloading with radius " + r), true);
-						return 1;
-					});
-			radiusStartCommand.then(argument("x", IntegerArgumentType.integer())
-					.then(argument("z", IntegerArgumentType.integer())
-							.executes(context -> {
-								int r = IntegerArgumentType.getInteger(context, "radius");
-								int x = IntegerArgumentType.getInteger(context, "x");
-								int z = IntegerArgumentType.getInteger(context, "z");
-								MinecraftServer server = context.getSource().getServer();
-								ensureState(server);
-								ServerLevel level = context.getSource().getLevel();
-								startPreload(level, x >> 4, z >> 4, r);
-								context.getSource().sendSuccess(() -> Component.literal("Started preloading around " + x + ", " + z + " with radius " + r), true);
-								return 1;
-							})));
-			startCommand.then(radiusStartCommand);
+
 			root.then(startCommand);
 
 			root.then(literal("border")
@@ -178,13 +150,10 @@ public class ChunkPreloadMod implements ModInitializer {
 						ensureState(server);
 						ServerLevel level = context.getSource().getLevel();
 						BlockPos pos = BlockPos.containing(context.getSource().getPosition());
-						
 						isBenchmarking = true;
 						benchmarkStartTime = System.currentTimeMillis();
-						
 						int oldRadius = CONFIG.radius;
 						startPreload(level, pos.getX() >> 4, pos.getZ() >> 4, 5);
-						
 						CONFIG.radius = oldRadius;
 						context.getSource().sendSuccess(() -> Component.literal("Starting 10x10 benchmark..."), true);
 						return 1;
@@ -233,7 +202,6 @@ public class ChunkPreloadMod implements ModInitializer {
 		ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
 			ensureState(server);
 			ServerPlayer player = handler.getPlayer();
-
 			if (CONFIG.enabled && !state.completed && !state.started) {
 				ServerLevel level = server.getLevel(Level.OVERWORLD);
 				if (level != null) {
@@ -241,7 +209,6 @@ public class ChunkPreloadMod implements ModInitializer {
 					startPreload(level, pos.getX() >> 4, pos.getZ() >> 4);
 				}
 			}
-
 			sendProgress(player);
 		});
 
@@ -318,8 +285,8 @@ public class ChunkPreloadMod implements ModInitializer {
 			boolean lowMemory = isLowMemory();
 			boolean tooManyPlayers = CONFIG.onlyPreloadWhenEmpty && server.getPlayerCount() > 0;
 			boolean lowDisk = isLowDiskSpace(server);
-			boolean serverIsBusy = !CONFIG.turboMode && (CONFIG.adaptiveThrottling
-					&& server.getAverageTickTimeNanos() > (long) (CONFIG.busyTickThresholdMs * 1_000_000L));
+			boolean serverIsBusy = !CONFIG.turboMode && CONFIG.adaptiveThrottling
+					&& server.getAverageTickTimeNanos() > (long) (CONFIG.busyTickThresholdMs * 1_000_000L);
 			boolean lowTps = !CONFIG.turboMode && (1000.0 / (server.getAverageTickTimeNanos() / 1_000_000.0)) < CONFIG.minTpsThreshold;
 
 			boolean canRequestMore = !lowMemory && (CONFIG.turboMode || (!serverIsBusy && !tooManyPlayers && !lowTps && !lowDisk));
@@ -363,6 +330,12 @@ public class ChunkPreloadMod implements ModInitializer {
 			tickCounter = 0;
 			broadcastProgress(server);
 		}
+	}
+
+	private static boolean isLowMemory() {
+		Runtime runtime = Runtime.getRuntime();
+		double used = (double) (runtime.totalMemory() - runtime.freeMemory()) / runtime.maxMemory();
+		return used > CONFIG.memoryUsageThreshold;
 	}
 
 	private static void handleConsoleLogging() {
@@ -461,8 +434,6 @@ public class ChunkPreloadMod implements ModInitializer {
 
 	private static void updateMapMods(ServerLevel level, int chunkX, int chunkZ) {
 		if (!CONFIG.notifyMapMods) return;
-		
-		// BlueMap support
 		try {
 			Class<?> apiClass = Class.forName("de.bluecolored.bluemap.api.BlueMapAPI");
 			Optional<?> api = (Optional<?>) apiClass.getMethod("getInstance").invoke(null);
@@ -481,12 +452,6 @@ public class ChunkPreloadMod implements ModInitializer {
 			}
 		} catch (Exception ignored) {}
 		
-		// Dynmap support
-		try {
-			Class<?> dynmapApiClass = Class.forName("org.dynmap.DynmapCommonAPI");
-		} catch (Exception ignored) {}
-		
-		// Xaero's Minimap / World Map support
 		tryInvokeMapRefresh(chunkX, chunkZ,
 				"xaero.minimap.XaeroMinimap",
 				"xaero.minimap.api.XaeroMinimapAPI",
@@ -544,12 +509,6 @@ public class ChunkPreloadMod implements ModInitializer {
 		return clazz;
 	}
 
-	private static boolean isLowMemory() {
-		Runtime runtime = Runtime.getRuntime();
-		double used = (double) (runtime.totalMemory() - runtime.freeMemory()) / runtime.maxMemory();
-		return used > CONFIG.memoryUsageThreshold;
-	}
-
 	private static void processCompletions(ServerLevel overworld) {
 		Integer completedIndex;
 		boolean changed = false;
@@ -594,19 +553,13 @@ public class ChunkPreloadMod implements ModInitializer {
 		double worldZ = (chunkZ << 4) + 8.0;
 		double dx = worldX - player.getX();
 		double dz = worldZ - player.getZ();
-		double distance = Math.hypot(dx, dz);
 		double travelled = dx * moveX + dz * moveZ;
-		return distance - Math.max(travelled, 0.0) * 3.0;
+		return Math.hypot(dx, dz) - Math.max(travelled, 0.0) * 3.0;
 	}
 
 	private static void rebuildPriorityQueue(ServerLevel overworld) {
 		priorityQueue.clear();
 		if (!CONFIG.routeAwarePreloading || totalChunks <= 0) {
-			for (int i = 0; i < totalChunks; i++) {
-				if (!completedIndices.contains(i) && !inFlightIndices.contains(i)) {
-					priorityQueue.add(i);
-				}
-			}
 			return;
 		}
 
@@ -618,14 +571,7 @@ public class ChunkPreloadMod implements ModInitializer {
 			}
 		}
 		
-		if (player == null) {
-			for (int i = 0; i < totalChunks; i++) {
-				if (!completedIndices.contains(i) && !inFlightIndices.contains(i)) {
-					priorityQueue.add(i);
-				}
-			}
-			return;
-		}
+		if (player == null) return;
 
 		double moveX = player.getDeltaMovement().x;
 		double moveZ = player.getDeltaMovement().z;
@@ -647,19 +593,32 @@ public class ChunkPreloadMod implements ModInitializer {
 				candidates.add(i);
 			}
 		}
-		final ServerPlayer priorityPlayer = player;
-		final double priorityMoveX = moveX;
-		final double priorityMoveZ = moveZ;
-		candidates.sort((a, b) -> Double.compare(scoreChunkPriority(a, priorityPlayer, priorityMoveX, priorityMoveZ), scoreChunkPriority(b, priorityPlayer, priorityMoveX, priorityMoveZ)));
-		priorityQueue.addAll(candidates);
+		final ServerPlayer p = player;
+		final double mx = moveX;
+		final double mz = moveZ;
+		candidates.sort(Comparator.comparingDouble(i -> scoreChunkPriority(i, p, mx, mz)));
+		
+		// Only take the closest 1000 chunks for priority queue to avoid lag.
+		for (int i = 0; i < Math.min(candidates.size(), 1000); i++) {
+			priorityQueue.add(candidates.get(i));
+		}
 	}
 
 	private static int nextQueuedIndex(ServerLevel overworld) {
-		if (priorityQueue.isEmpty()) {
-			rebuildPriorityQueue(overworld);
+		if (CONFIG.routeAwarePreloading) {
+			if (priorityQueue.isEmpty()) {
+				rebuildPriorityQueue(overworld);
+			}
+			while (!priorityQueue.isEmpty()) {
+				int index = priorityQueue.pollFirst();
+				if (!completedIndices.contains(index) && !inFlightIndices.contains(index)) {
+					return index;
+				}
+			}
 		}
-		while (!priorityQueue.isEmpty()) {
-			int index = priorityQueue.remove(0);
+
+		while (nextRequestIndex < totalChunks) {
+			int index = nextRequestIndex++;
 			if (!completedIndices.contains(index) && !inFlightIndices.contains(index)) {
 				return index;
 			}
@@ -671,7 +630,6 @@ public class ChunkPreloadMod implements ModInitializer {
 		if (currentServer == null || currentServer.isStopped() || isLowMemory()) return;
 
 		int maxConcurrency = CONFIG.maxConcurrentAsyncChunks;
-		
 		if (cachedTargetStatus == null) {
 			String statusId = CONFIG.structureOnlyMode ? "minecraft:structure_starts" : CONFIG.targetStatus;
 			cachedTargetStatus = BuiltInRegistries.CHUNK_STATUS.get(Identifier.parse(statusId))
@@ -718,7 +676,6 @@ public class ChunkPreloadMod implements ModInitializer {
 
 	private static void broadcastProgress(MinecraftServer server) {
 		boolean active = CONFIG.enabled && state != null && state.started && !state.completed;
-
 		if (state != null && state.doneCount == lastBroadcastDone && active == lastBroadcastActive) return;
 
 		if (state != null) {
@@ -752,8 +709,8 @@ public class ChunkPreloadMod implements ModInitializer {
 	private static void buildSpiral(int radius) {
 		int side = 2 * radius + 1;
 		int maxCells = side * side;
-		int[] tmpX = new int[maxCells];
-		int[] tmpZ = new int[maxCells];
+		short[] tmpX = new short[maxCells];
+		short[] tmpZ = new short[maxCells];
 		int count = 0;
 		long radiusSquared = (long) radius * radius;
 
@@ -765,22 +722,22 @@ public class ChunkPreloadMod implements ModInitializer {
 			for (int dx = -r; dx <= r; dx++) {
 				boolean inShape = (CONFIG.shape == ChunkPreloadConfig.Shape.SQUARE) || ((long) dx * dx + (long) r * r <= radiusSquared);
 				if (inShape) {
-					tmpX[count] = dx;
-					tmpZ[count] = -r;
+					tmpX[count] = (short) dx;
+					tmpZ[count] = (short) -r;
 					count++;
-					tmpX[count] = dx;
-					tmpZ[count] = r;
+					tmpX[count] = (short) dx;
+					tmpZ[count] = (short) r;
 					count++;
 				}
 			}
 			for (int dz = -r + 1; dz <= r - 1; dz++) {
 				boolean inShape = (CONFIG.shape == ChunkPreloadConfig.Shape.SQUARE) || ((long) r * r + (long) dz * dz <= radiusSquared);
 				if (inShape) {
-					tmpX[count] = -r;
-					tmpZ[count] = dz;
+					tmpX[count] = (short) -r;
+					tmpZ[count] = (short) dz;
 					count++;
-					tmpX[count] = r;
-					tmpZ[count] = dz;
+					tmpX[count] = (short) r;
+					tmpZ[count] = (short) dz;
 					count++;
 				}
 			}
@@ -789,7 +746,6 @@ public class ChunkPreloadMod implements ModInitializer {
 		offsetX = Arrays.copyOf(tmpX, count);
 		offsetZ = Arrays.copyOf(tmpZ, count);
 		totalChunks = count;
-
 		LOGGER.info("Chunk Preloader configured for a {}-chunk {} ({} chunks total)", radius, CONFIG.shape, totalChunks);
 	}
 }

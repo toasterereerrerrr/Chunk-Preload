@@ -5,7 +5,7 @@
   "routeAwarePreloading": false,
   "busyTickThresholdMs": 45.0,
   "memoryUsageThreshold": 0.9,
-  "turboMode": true,
+  "turboMode": false,
   "cpuUsageLevel": "MEDIUM",
   "maxConcurrentAsyncChunks": 32,
   "immediateRefill": true,
