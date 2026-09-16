@@ -19,10 +19,11 @@ public abstract class PauseScreenMixin extends Screen {
 
     @Inject(method = "init", at = @At("RETURN"))
     private void addPreloaderButton(CallbackInfo ci) {
-        int x = this.width / 2 + 104;
-        int y = this.height / 4 + 48 + -16;
+        // Place the RF button to the left of the Options button row
+        int x = this.width / 2 - 102 - 24;
+        int y = this.height / 4 + 96;
 
-        this.addRenderableWidget(Button.builder(Component.literal("CP"), button -> {
+        this.addRenderableWidget(Button.builder(Component.literal("RF"), button -> {
             this.minecraft.setScreenAndShow(RenderFastConfigScreen.create(this));
         }).bounds(x, y, 20, 20).tooltip(Tooltip.create(Component.literal("RenderFast Configuration"))).build());
     }

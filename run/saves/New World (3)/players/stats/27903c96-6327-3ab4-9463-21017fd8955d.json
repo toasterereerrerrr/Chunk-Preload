@@ -1,0 +1,32 @@
+{
+  "stats": {
+    "minecraft:killed": {
+      "minecraft:pig": 2,
+      "minecraft:villager": 1
+    },
+    "minecraft:used": {
+      "minecraft:elytra": 5,
+      "minecraft:netherite_chestplate": 4,
+      "minecraft:mace": 4,
+      "minecraft:firework_rocket": 179
+    },
+    "minecraft:custom": {
+      "minecraft:time_since_rest": 69,
+      "minecraft:walk_one_cm": 9185,
+      "minecraft:leave_game": 1,
+      "minecraft:mob_kills": 3,
+      "minecraft:walk_under_water_one_cm": 20175,
+      "minecraft:play_time": 541,
+      "minecraft:damage_dealt": 400,
+      "minecraft:jump": 62,
+      "minecraft:time_since_death": 68,
+      "minecraft:aviate_one_cm": 414044,
+      "minecraft:sprint_one_cm": 3524,
+      "minecraft:total_world_time": 4524,
+      "minecraft:fly_one_cm": 31479,
+      "minecraft:walk_on_water_one_cm": 2704,
+      "minecraft:deaths": 1
+    }
+  },
+  "DataVersion": 4903
+}

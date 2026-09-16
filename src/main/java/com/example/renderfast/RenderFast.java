@@ -279,18 +279,20 @@ public class RenderFast implements ModInitializer {
 			boolean tooManyPlayers = CONFIG.onlyPreloadWhenEmpty && !empty;
 			boolean lowDisk = (server.getWorldPath(LevelResource.ROOT).toFile().getFreeSpace() / (1024 * 1024)) < CONFIG.minFreeDiskSpaceMb;
 			boolean lowMemory = isLowMemory();
-			boolean busy = !isTurbo && (CONFIG.adaptiveThrottling && server.getAverageTickTimeNanos() > (long) (CONFIG.busyTickThresholdMs * 1_000_000L));
-			boolean lowTps = !isTurbo && (1000.0 / (server.getAverageTickTimeNanos() / 1_000_000.0)) < CONFIG.minTpsThreshold;
+			long avgTickNanos = server.getAverageTickTimeNanos();
+			boolean busy = !isTurbo && (CONFIG.adaptiveThrottling && avgTickNanos > (long) (CONFIG.busyTickThresholdMs * 1_000_000L));
+			boolean lowTps = !isTurbo && (1000.0 / (avgTickNanos / 1_000_000.0)) < CONFIG.minTpsThreshold;
 
 			if (lowMemory) currentPauseReason = "LOW RAM";
 			else if (tooManyPlayers) currentPauseReason = "PLAYERS ONLINE";
 			else if (lowDisk) currentPauseReason = "LOW DISK";
-			else if (busy) currentPauseReason = "BUSY TICK";
+			else if (busy) currentPauseReason = "BUSY TICK (" + (avgTickNanos / 1_000_000L) + "ms)";
 			else if (lowTps) currentPauseReason = "LOW TPS";
 			else if (CONFIG.dryRunMode) { currentPauseReason = "DRY RUN"; showDryRunParticles(currentLevel); }
 			else {
 				currentPauseReason = "";
-				requestMoreChunks(currentLevel, 64);
+				int limit = isTurbo ? 128 : (CONFIG.cpuUsageLevel == RenderFastConfig.CpuUsageLevel.LOW ? 16 : 64);
+				requestMoreChunks(currentLevel, limit);
 			}
 
 			if (state.doneCount >= totalChunks && !state.completed) { finishDimension(server); return; }
@@ -447,13 +449,18 @@ public class RenderFast implements ModInitializer {
 			level.getChunkSource().getChunkFuture(cp.x(), cp.z(), cachedTargetStatus, true).whenComplete((res, thr) -> {
 				pendingCompletionQueue.add(i);
 				if (CONFIG.immediateRefill && currentServer != null && !currentServer.isStopped() && refillTaskPending.compareAndSet(false, true)) {
-					currentServer.execute(() -> {
-						refillTaskPending.set(false);
-						if (currentServer != null && !currentServer.isStopped() && state != null && state.started && !state.completed) {
-							ServerLevel l = getLevelForDimension(currentServer, state.dimension);
-							if (l != null) { processCompletions(l); requestMoreChunks(l, 16); }
-						}
-					});
+					// Check if server is already under heavy load before scheduling refill
+					if (!CONFIG.adaptiveThrottling || currentServer.getAverageTickTimeNanos() < (long)(CONFIG.busyTickThresholdMs * 0.8 * 1_000_000L)) {
+						currentServer.execute(() -> {
+							refillTaskPending.set(false);
+							if (currentServer != null && !currentServer.isStopped() && state != null && state.started && !state.completed) {
+								ServerLevel l = getLevelForDimension(currentServer, state.dimension);
+								if (l != null) { processCompletions(l); requestMoreChunks(l, 8); }
+							}
+						});
+					} else {
+						refillTaskPending.set(false); // Drop this refill request to allow server to breathe
+					}
 				}
 			});
 		}

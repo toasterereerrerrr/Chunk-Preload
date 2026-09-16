@@ -80,3 +80,68 @@ publishing {
 		// retrieving dependencies.
 	}
 }
+
+// Auto-install built mod to project run/mods folder (configurable)
+// Usage: gradlew build -PmodsDir="C:/path/to/mods" -PautoCopyToMods=true
+def modsDirProp = project.hasProperty('modsDir') ? project.property('modsDir') : null
+def autoCopy = project.hasProperty('autoCopyToMods') ? project.property('autoCopyToMods').toString().toBoolean() : true
+// default to <projectRoot>/run/mods so the mod is available for the project's run configuration
+def defaultModsDir = file("${project.projectDir}/run/mods")
+
+task copyJarToMods(type: Copy) {
+	description = 'Copies the built mod jar to the project run/mods folder (deletes previous versions first).'
+	group = 'distribution'
+	def jarFile = file("${buildDir}/libs/${project.name}-${project.version}.jar")
+	from(jarFile)
+	def destDir = modsDirProp ? file(modsDirProp) : defaultModsDir
+	into destDir
+	doFirst {
+		if (!jarFile.exists()) throw new GradleException("Jar not found: ${jarFile}")
+		println "Preparing to copy ${jarFile} -> ${destDir}"
+		destDir.mkdirs()
+		// Archive only the canonical current jar (projectName-version.jar) by renaming it with a timestamp
+		try {
+			def currentName = "${project.name}-${project.version}.jar"
+			def now = new Date()
+			def ts = now.format("yyyyMMdd-HHmmss")
+			def existing = new File(destDir, currentName)
+			if (existing.exists()) {
+				def base = existing.name.replaceAll(/(\\.jar)$/, "")
+				def newName = "${base}-${ts}.jar"
+				def target = new File(destDir, newName)
+				int i = 1
+				while (target.exists()) {
+					target = new File(destDir, "${base}-${ts}-${i}.jar")
+					i++
+				}
+				println "Archiving previous mod: ${existing.name} -> ${target.name}"
+				if (!existing.renameTo(target)) {
+					println "Failed to archive ${existing.name} to ${target.name}"
+				}
+			}
+		} catch (Exception e) { println "Warning while archiving previous jars: ${e.message}" }
+	}
+}
+
+// After copying, remove archived/older copies if configured to keep none
+copyJarToMods.doLast {
+	def currentName = "${project.name}-${project.version}.jar"
+	def dest = modsDirProp ? file(modsDirProp) : defaultModsDir
+	try {
+		File[] files = dest.listFiles()
+		if (files != null) {
+			files.each { File f ->
+				if (f.name.toLowerCase().startsWith(project.name.toLowerCase() + "-") && f.name.toLowerCase().endsWith('.jar') && f.name != currentName) {
+					println "Deleting older archived mod: ${f.name}"
+					if (!f.delete()) println "Failed to delete ${f.name}"
+				}
+			}
+		}
+	} catch (Exception e) { println "Warning while cleaning archived jars: ${e.message}" }
+}
+
+if (autoCopy) {
+	tasks.named('build') {
+		finalizedBy copyJarToMods
+	}
+}

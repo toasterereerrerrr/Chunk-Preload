@@ -1,1 +1,352 @@
-[01:31:47] [Render thread/INFO] (Minecraft) Stopping!
+[16:34:49] [main/INFO] (FabricLoader/GameProvider) Loading Minecraft 26.2 with Fabric Loader 0.19.5
+[16:34:49] [main/INFO] (FabricLoader/Mappings) Mappings not present!
+[16:34:49] [main/INFO] (FabricLoader) Loading 84 mods:
+	- c2me 0.4.2-alpha.0.52+26.2
+	   |-- c2me-base 0.4.2-alpha.0.52+26.2
+	   |-- c2me-client-uncapvd 0.4.2-alpha.0.52+26.2
+	   |-- c2me-fixes-chunkio-threading-issues 0.4.2-alpha.0.52+26.2
+	   |-- c2me-fixes-general-threading-issues 0.4.2-alpha.0.52+26.2
+	   |-- c2me-fixes-worldgen-threading-issues 0.4.2-alpha.0.52+26.2
+	   |-- c2me-fixes-worldgen-vanilla-bugs 0.4.2-alpha.0.52+26.2
+	   |-- c2me-notickvd 0.4.2-alpha.0.52+26.2
+	   |-- c2me-opts-allocs 0.4.2-alpha.0.52+26.2
+	   |-- c2me-opts-chunkio 0.4.2-alpha.0.52+26.2
+	   |-- c2me-opts-dfc 0.4.2-alpha.0.52+26.2
+	   |-- c2me-opts-math 0.4.2-alpha.0.52+26.2
+	   |-- c2me-opts-natives-math 0.4.2-alpha.0.52+26.2
+	   |-- c2me-opts-scheduling 0.4.2-alpha.0.52+26.2
+	   |-- c2me-opts-worldgen-general 0.4.2-alpha.0.52+26.2
+	   |-- c2me-opts-worldgen-vanilla 0.4.2-alpha.0.52+26.2
+	   |-- c2me-rewrites-chunk-serializer 0.4.2-alpha.0.52+26.2
+	   |-- c2me-rewrites-chunk-system 0.4.2-alpha.0.52+26.2
+	   |-- c2me-rewrites-chunkio 0.4.2-alpha.0.52+26.2
+	   |-- c2me-server-utils 0.4.2-alpha.0.52+26.2
+	   |-- c2me-threading-lighting 0.4.2-alpha.0.52+26.2
+	   |-- com_electronwill_night-config_core 3.6.5
+	   |-- com_electronwill_night-config_toml 3.6.5
+	   |-- com_github_ben-manes_caffeine_caffeine 3.2.1
+	   |-- com_ibm_async_asyncutil 0.1.0
+	   |-- io_reactivex_rxjava3_rxjava 3.1.12
+	   |-- mixinsquared 0.3.7-beta.1
+	   |-- net_objecthunter_exp4j 0.4.8
+	   |-- org_jctools_jctools-core 4.0.5
+	   \-- org_reactivestreams_reactive-streams 1.0.4
+	- cloth-basic-math 0.6.1
+	- cloth-config 26.2.155
+	- fabric-api 0.160.0+26.2
+	- fabric-api-base 2.0.4+ece063239e
+	- fabric-api-lookup-api-v1 2.0.18+11e1c9a39e
+	- fabric-biome-api-v1 18.0.6+c7bd5b8e9e
+	- fabric-block-api-v1 3.1.0+53515aab9e
+	- fabric-block-getter-api-v2 2.0.7+ec56b6019e
+	- fabric-client-gametest-api-v1 6.0.2+0f4f1dca9e
+	- fabric-command-api-v2 3.1.0+00cb03469e
+	- fabric-content-registries-v0 11.3.2+37b1aa249e
+	- fabric-convention-tags-v2 4.7.1+1f023a9e9e
+	- fabric-crash-report-info-v1 1.0.5+086d547a9e
+	- fabric-creative-tab-api-v1 5.0.15+6468574f9e
+	- fabric-data-attachment-api-v1 2.2.19+515ac5339e
+	- fabric-data-generation-api-v1 25.6.0+c0da0b829e
+	- fabric-debug-api-v1 1.0.2+c792624d9e
+	- fabric-dimensions-v1 5.1.12+515ac5339e
+	- fabric-entity-events-v1 5.0.5+06488ac19e
+	- fabric-events-interaction-v0 5.2.8+515ac5339e
+	- fabric-game-rule-api-v1 4.0.8+46a6d00c9e
+	- fabric-gametest-api-v1 4.0.22+4a7fa0819e
+	- fabric-item-api-v1 14.5.0+c68f6cbe9e
+	- fabric-key-mapping-api-v1 2.0.5+e2bdee789e
+	- fabric-lifecycle-events-v1 4.1.4+29b6eb019e
+	- fabric-loot-api-v3 3.0.17+06488ac19e
+	- fabric-menu-api-v1 2.0.17+086d547a9e
+	- fabric-message-api-v1 7.0.8+bb2ed3f79e
+	- fabric-model-loading-api-v1 8.0.17+c80601bb9e
+	- fabric-networking-api-v1 6.3.4+2989c6a09e
+	- fabric-object-builder-api-v1 24.1.1+6fcd5f039e
+	- fabric-particles-v1 5.0.19+d1756aa99e
+	- fabric-permission-api-v1 1.0.5+e442d8d09e
+	- fabric-recipe-api-v1 9.0.22+11e1c9a39e
+	- fabric-registry-sync-v0 7.1.1+c7bd5b8e9e
+	- fabric-renderer-api-v1 14.1.4+2b0d8a229e
+	- fabric-renderer-indigo 9.1.4+2b0d8a229e
+	- fabric-rendering-fluids-v1 6.0.4+06488ac19e
+	- fabric-rendering-v1 25.3.3+515ac5339e
+	- fabric-resource-conditions-api-v1 6.1.0+10e9a28b9e
+	- fabric-resource-loader-v0 3.3.20+4fc5413f9e
+	- fabric-resource-loader-v1 2.0.13+9edec1269e
+	- fabric-screen-api-v1 5.2.1+5087f8249e
+	- fabric-serialization-api-v1 2.0.4+11a26f319e
+	- fabric-sound-api-v1 2.0.5+11a26f319e
+	- fabric-tag-api-v1 2.1.4+515ac5339e
+	- fabric-transfer-api-v1 8.0.13+11dbb7d79e
+	- fabric-transitive-access-wideners-v1 8.1.4+67c847259e
+	- fabricloader 0.19.5
+	- java 25
+	- minecraft 26.2
+	- mixinextras 0.5.5
+	- modmenu 20.0.2
+	- renderfast 1.0.0
+[16:34:49] [main/INFO] (FabricLoader/Mixin) SpongePowered MIXIN Subsystem Version=0.8.7 Source=file:/C:/Users/arunm/.gradle/caches/modules-2/files-2.1/net.fabricmc/sponge-mixin/0.17.4+mixin.0.8.7/5f66cc9f59b8efaa942155a3d5a30599bf6640dd/sponge-mixin-0.17.4+mixin.0.8.7.jar Service=Knot/Fabric Env=CLIENT
+[16:34:50] [main/INFO] (C2ME Modules Manager) Initializing com.ishland.c2me.opts.worldgen.general.mixin
+[16:34:50] [main/INFO] (C2ME Modules Manager) Initializing com.ishland.c2me.opts.dfc.mixin
+[16:34:50] [main/INFO] (C2ME Modules Manager) Initializing com.ishland.c2me.opts.chunkio.mixin
+[16:34:50] [main/INFO] (C2ME Modules Manager) Initializing com.ishland.c2me.fixes.worldgen.threading_issues.mixin
+[16:34:50] [main/INFO] (C2ME Modules Manager) Initializing com.ishland.c2me.opts.scheduling.mixin
+[16:34:50] [main/INFO] (C2ME Modules Manager) Initializing com.ishland.c2me.opts.allocs.mixin
+[16:34:50] [main/INFO] (C2ME Modules Manager) Initializing com.ishland.c2me.fixes.worldgen.vanilla_bugs.mixin
+[16:34:50] [main/INFO] (C2ME Modules Manager) Initializing com.ishland.c2me.rewrites.chunkio.mixin
+[16:34:50] [main/INFO] (C2ME Modules Manager) Initializing com.ishland.c2me.base.mixin
+[16:34:50] [main/INFO] (ModuleEntryPoint) CPU name: AMD Ryzen 5 8540U w/ Radeon 740M Graphics      
+[16:34:50] [main/INFO] (ModuleEntryPoint) Detected 6 available physical CPUs, 12 available logical CPUs
+[16:34:50] [main/INFO] (ModuleEntryPoint) Detected 6 available physical CPUs, 12 available logical CPUs
+[16:34:50] [main/INFO] (C2ME Config System) Global Executor Parallelism: 5 configured, 5 evaluated, 5 default evaluated
+[16:34:50] [main/INFO] (C2ME Modules Manager) Initializing com.ishland.c2me.rewrites.chunksystem.mixin
+[16:34:50] [main/INFO] (C2ME Modules Manager) Initializing com.ishland.c2me.client.uncapvd.mixin
+[16:34:50] [main/INFO] (C2ME Modules Manager) Initializing com.ishland.c2me.rewrites.chunk_serializer.mixin
+[16:34:50] [main/INFO] (C2ME Modules Manager) Disabling com.ishland.c2me.rewrites.chunk_serializer.mixin
+[16:34:50] [main/INFO] (C2ME Modules Manager) Initializing com.ishland.c2me.opts.math.mixin
+[16:34:50] [main/INFO] (C2ME Modules Manager) Initializing com.ishland.c2me.fixes.chunkio.threading_issues.mixin
+[16:34:50] [main/INFO] (C2ME Modules Manager) Initializing com.ishland.c2me.server.utils.mixin
+[16:34:50] [main/INFO] (C2ME Modules Manager) Initializing com.ishland.c2me.threading.lighting.mixin
+[16:34:50] [main/INFO] (C2ME Modules Manager) Initializing com.ishland.c2me.opts.worldgen.vanilla.mixin
+[16:34:50] [main/INFO] (C2ME Modules Manager) Initializing com.ishland.c2me.opts.natives_math.mixin
+[16:34:50] [main/INFO] (NativeLoader) Attempting to call native library. If your game crashes right after this point, native acceleration may not be available for your system.
+[16:34:50] [main/INFO] (NativeLoader) Detected maximum supported ISA target: AVX2
+[16:34:50] [main/INFO] (C2ME Modules Manager) Initializing com.ishland.c2me.notickvd.mixin
+[16:34:50] [main/INFO] (C2ME Modules Manager) Initializing com.ishland.c2me.fixes.general.threading_issues.mixin
+[16:34:51] [main/WARN] (FabricLoader/Mixin) Error loading class: ca/spottedleaf/starlight/common/integration/v0/ChunkSystemHooks (java.lang.ClassNotFoundException: ca/spottedleaf/starlight/common/integration/v0/ChunkSystemHooks)
+[16:34:51] [main/WARN] (FabricLoader/Mixin) @Mixin target ca/spottedleaf/starlight/common/integration/v0/ChunkSystemHooks was not found c2me-rewrites-chunk-system.mixins.json:scalablelux.MixinChunkSystemHooks from mod c2me-rewrites-chunk-system
+[16:34:51] [main/WARN] (FabricLoader/Mixin) Error loading class: net/vulkanmod/config/option/Options (java.lang.ClassNotFoundException: net/vulkanmod/config/option/Options)
+[16:34:51] [main/WARN] (FabricLoader/Mixin) Error loading class: ca/spottedleaf/starlight/common/thread/SchedulingUtil (java.lang.ClassNotFoundException: ca/spottedleaf/starlight/common/thread/SchedulingUtil)
+[16:34:52] [main/INFO] (FabricLoader/MixinExtras|Service) Initializing MixinExtras via com.llamalad7.mixinextras.service.MixinExtrasServiceImpl(version=0.5.5).
+[16:34:53] [Datafixer Bootstrap #0/INFO] (Minecraft) 295 Datafixer optimizations took 350 milliseconds
+[16:34:59] [Render thread/INFO] (Minecraft) Environment: Environment[sessionHost=https://sessionserver.mojang.com, servicesHost=https://api.minecraftservices.com, profilesHost=https://api.mojang.com, name=PROD]
+[16:34:59] [Render thread/INFO] (Minecraft) Setting user: Player131
+[16:34:59] [Download-2/ERROR] (Minecraft) Failed to fetch user properties
+com.mojang.authlib.exceptions.InvalidCredentialsException: Status: 401
+	at knot//com.mojang.authlib.exceptions.MinecraftClientHttpException.toAuthenticationException(MinecraftClientHttpException.java:70)
+	at knot//com.mojang.authlib.yggdrasil.YggdrasilUserApiService.fetchProperties(YggdrasilUserApiService.java:173)
+	at knot//net.minecraft.client.Minecraft.lambda$new$1(Minecraft.java:438)
+	at java.base/java.util.concurrent.CompletableFuture$AsyncSupply.run(Unknown Source)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(Unknown Source)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(Unknown Source)
+	at java.base/java.lang.Thread.run(Unknown Source)
+Caused by: MinecraftClientHttpException[type=HTTP_ERROR, status=401, response=ErrorResponse[path=/player/attributes, error=null, errorMessage=null, details=null]]
+	at knot//com.mojang.authlib.minecraft.client.MinecraftClient.buildHttpException(MinecraftClient.java:170)
+	at knot//com.mojang.authlib.minecraft.client.MinecraftClient.readServiceResponse(MinecraftClient.java:147)
+	at knot//com.mojang.authlib.minecraft.client.MinecraftClient.getWithEtag(MinecraftClient.java:81)
+	at knot//com.mojang.authlib.minecraft.client.MinecraftClient.get(MinecraftClient.java:65)
+	at knot//com.mojang.authlib.yggdrasil.YggdrasilUserApiService.fetchProperties(YggdrasilUserApiService.java:123)
+	... 5 more
+[16:34:59] [Render thread/INFO] (Indigo) [Indigo] Registering Indigo renderer!
+[16:34:59] [Render thread/INFO] (Mod Menu/Update Checker) Checking mod updates...
+[16:35:00] [Render thread/INFO] (Minecraft) Backend library: LWJGL version 3.4.1-snapshot
+[16:35:00] [Render thread/INFO] (Minecraft) Using graphics backend OpenGL, using drivers: 3.3.0 Core Profile Context 26.8.1.260810
+[16:35:00] [Render thread/INFO] (Minecraft) Using graphics device: AMD Radeon 740M Graphics (ATI Technologies Inc.)
+[16:35:00] [Render thread/INFO] (Minecraft) Using graphics device extensions: GL_ARB_multi_draw_indirect, GL_ARB_buffer_storage, GL_ARB_shader_draw_parameters, GL_ARB_base_instance, GL_KHR_debug, GL_ARB_draw_indirect, GL_ARB_clip_control, GL_ARB_vertex_attrib_binding, GL_ARB_direct_state_access, GL_EXT_texture_filter_anisotropic
+[16:35:01] [Download-2/INFO] (Minecraft) Could not authorize you against Realms server: java.lang.RuntimeException: Failed to parse into SignedJWT: FabricMC
+[16:35:01] [Download-2/ERROR] (Minecraft) Failed to fetch Realms feature flags
+com.mojang.realmsclient.exception.RealmsServiceException: Realms authentication error with message 'java.lang.RuntimeException: Failed to parse into SignedJWT: FabricMC'
+	at knot//com.mojang.realmsclient.client.RealmsClient.execute(RealmsClient.java:528)
+	at knot//com.mojang.realmsclient.client.RealmsClient.fetchFeatureFlags(RealmsClient.java:187)
+	at java.base/java.util.concurrent.CompletableFuture$AsyncSupply.run(Unknown Source)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(Unknown Source)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(Unknown Source)
+	at java.base/java.lang.Thread.run(Unknown Source)
+[16:35:01] [Render thread/INFO] (Minecraft) Reloading ResourceManager: vanilla, c2me, cloth-config, fabric-api, fabric-api-base, fabric-api-lookup-api-v1, fabric-biome-api-v1, fabric-block-api-v1, fabric-block-getter-api-v2, fabric-client-gametest-api-v1, fabric-command-api-v2, fabric-content-registries-v0, fabric-convention-tags-v2, fabric-crash-report-info-v1, fabric-creative-tab-api-v1, fabric-data-attachment-api-v1, fabric-data-generation-api-v1, fabric-debug-api-v1, fabric-dimensions-v1, fabric-entity-events-v1, fabric-events-interaction-v0, fabric-game-rule-api-v1, fabric-gametest-api-v1, fabric-item-api-v1, fabric-key-mapping-api-v1, fabric-lifecycle-events-v1, fabric-loot-api-v3, fabric-menu-api-v1, fabric-message-api-v1, fabric-model-loading-api-v1, fabric-networking-api-v1, fabric-object-builder-api-v1, fabric-particles-v1, fabric-permission-api-v1, fabric-recipe-api-v1, fabric-registry-sync-v0, fabric-renderer-api-v1, fabric-renderer-indigo, fabric-rendering-fluids-v1, fabric-rendering-v1, fabric-resource-conditions-api-v1, fabric-resource-loader-v0, fabric-resource-loader-v1, fabric-screen-api-v1, fabric-serialization-api-v1, fabric-sound-api-v1, fabric-tag-api-v1, fabric-transfer-api-v1, fabric-transitive-access-wideners-v1, fabricloader, modmenu, renderfast
+[16:35:01] [Worker-Main-7/INFO] (Minecraft) Found unifont_all_no_pua-17.0.01.hex, loading
+[16:35:01] [Worker-Main-9/INFO] (Minecraft) Found unifont_pua-17.0.01.hex, loading
+[16:35:01] [Worker-Main-8/INFO] (Minecraft) Found unifont_jp_patch-17.0.01.hex, loading
+[16:35:03] [Render thread/INFO] (Minecraft) OpenAL initialized on device OpenAL Soft on Headphones (WH304B)
+[16:35:03] [Render thread/INFO] (Minecraft) Sound engine started
+[16:35:03] [Render thread/INFO] (Minecraft) Created: 512x256x0 minecraft:textures/atlas/particles.png-atlas
+[16:35:03] [Render thread/INFO] (Minecraft) Created: 128x128x0 minecraft:textures/atlas/decorated_pot.png-atlas
+[16:35:03] [Render thread/INFO] (Minecraft) Created: 2048x1024x0 minecraft:textures/atlas/armor_trims.png-atlas
+[16:35:03] [Render thread/INFO] (Minecraft) Created: 512x256x0 minecraft:textures/atlas/paintings.png-atlas
+[16:35:03] [Render thread/INFO] (Minecraft) Created: 1024x512x0 minecraft:textures/atlas/shield_patterns.png-atlas
+[16:35:03] [Render thread/INFO] (Minecraft) Created: 2048x2048x4 minecraft:textures/atlas/blocks.png-atlas
+[16:35:03] [Render thread/INFO] (Minecraft) Created: 512x512x0 minecraft:textures/atlas/chest.png-atlas
+[16:35:03] [Render thread/INFO] (Minecraft) Created: 256x128x0 minecraft:textures/atlas/celestials.png-atlas
+[16:35:03] [Render thread/INFO] (Minecraft) Created: 1024x512x0 minecraft:textures/atlas/banner_patterns.png-atlas
+[16:35:03] [Render thread/INFO] (Minecraft) Created: 1024x512x0 minecraft:textures/atlas/items.png-atlas
+[16:35:03] [Render thread/INFO] (Minecraft) Created: 1024x1024x0 minecraft:textures/atlas/gui.png-atlas
+[16:35:03] [Render thread/INFO] (Minecraft) Created: 128x64x0 minecraft:textures/atlas/map_decorations.png-atlas
+[16:35:03] [Render thread/INFO] (Minecraft) Created: 512x512x0 minecraft:textures/atlas/shulker_boxes.png-atlas
+[16:35:03] [Download-2/INFO] (Minecraft) Could not authorize you against Realms server: java.lang.RuntimeException: Failed to parse into SignedJWT: FabricMC
+[16:35:03] [Download-2/ERROR] (Minecraft) Couldn't connect to realms
+com.mojang.realmsclient.exception.RealmsServiceException: Realms authentication error with message 'java.lang.RuntimeException: Failed to parse into SignedJWT: FabricMC'
+	at knot//com.mojang.realmsclient.client.RealmsClient.execute(RealmsClient.java:528)
+	at knot//com.mojang.realmsclient.client.RealmsClient.clientCompatible(RealmsClient.java:308)
+	at knot//com.mojang.realmsclient.RealmsAvailability.lambda$check$0(RealmsAvailability.java:48)
+	at java.base/java.util.concurrent.CompletableFuture$AsyncSupply.run(Unknown Source)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(Unknown Source)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(Unknown Source)
+	at java.base/java.lang.Thread.run(Unknown Source)
+[16:35:10] [Render thread/INFO] (Minecraft) Loaded 1585 recipes
+[16:35:10] [Render thread/INFO] (Minecraft) Loaded 1688 advancements
+[16:35:13] [Render thread/INFO] (BiomeModificationImpl) Applied 0 biome modifications to 0 of 66 new biomes in 761.2 μs
+[16:35:13] [Server thread/INFO] (Minecraft) Starting integrated minecraft server version 26.2
+[16:35:13] [Server thread/INFO] (Minecraft) Generating keypair
+[16:35:13] [Server thread/INFO] (CheckedThreadLocalRandom) Enforcing safe world random access
+[16:35:13] [Server thread/INFO] (Minecraft) [STDOUT]: Density function compilation finished in 301.0 ms
+[16:35:13] [Server thread/INFO] (TheSpeedyObjectFactory) Using TheSpeedyObjectFactory with Unsafe
+[16:35:13] [Server thread/INFO] (Minecraft) Selecting global world spawn...
+[16:35:15] [Server thread/INFO] (Minecraft) [STDOUT]: Density function compilation finished in 10.32 ms
+[16:35:15] [Server thread/INFO] (Minecraft) [STDOUT]: Density function compilation finished in 6.171 ms
+[16:35:15] [Server thread/INFO] (Minecraft) Loading 0 persistent chunks...
+[16:35:15] [Server thread/INFO] (Minecraft) Preparing spawn area: 16%
+[16:35:15] [Server thread/INFO] (Minecraft) Saving chunks for level 'ServerLevel[New World]'/minecraft:overworld
+[16:35:15] [Server thread/INFO] (Minecraft) Saving chunks for level 'ServerLevel[New World]'/minecraft:the_nether
+[16:35:15] [Server thread/INFO] (Minecraft) Saving chunks for level 'ServerLevel[New World]'/minecraft:the_end
+[16:35:15] [Server thread/INFO] (Minecraft) ThreadedAnvilChunkStorage (world): All chunks are saved
+[16:35:15] [Server thread/INFO] (Minecraft) ThreadedAnvilChunkStorage (DIM-1): All chunks are saved
+[16:35:15] [Server thread/INFO] (Minecraft) ThreadedAnvilChunkStorage (DIM1): All chunks are saved
+[16:35:15] [Server thread/INFO] (Minecraft) ThreadedAnvilChunkStorage: All dimensions are saved
+[16:35:17] [Server thread/INFO] (Minecraft) Loading 0 chunks for player spawn...
+[16:35:17] [Server thread/INFO] (Minecraft) Preparing spawn area: 16%
+[16:35:17] [Server thread/INFO] (Minecraft) Preparing spawn area: 16%
+[16:35:17] [Server thread/INFO] (Minecraft) Preparing spawn area: 16%
+[16:35:17] [Server thread/INFO] (Minecraft) Preparing spawn area: 16%
+[16:35:17] [Server thread/INFO] (Minecraft) Preparing spawn area: 16%
+[16:35:17] [Server thread/INFO] (Minecraft) Preparing spawn area: 16%
+[16:35:17] [Server thread/INFO] (Minecraft) Preparing spawn area: 16%
+[16:35:17] [Server thread/INFO] (Minecraft) Preparing spawn area: 16%
+[16:35:18] [Server thread/INFO] (Minecraft) Preparing spawn area: 16%
+[16:35:18] [Server thread/INFO] (Minecraft) Preparing spawn area: 16%
+[16:35:18] [Server thread/INFO] (Minecraft) Time elapsed: 5154 ms
+[16:35:19] [Render thread/INFO] (C2ME ClientExtNetworking) Joined server with c2me:ext_render_distance_v1 support
+[16:35:19] [Server thread/INFO] (Minecraft) Player131[local:E:ed17e7bb] logged in with entity id 1 at (-66.5, 65.0, 54.5)
+[16:35:19] [Server thread/INFO] (RenderFast) Starting chunk preload: 31417 chunks in minecraft:overworld around (-5, 3) with radius 100
+[16:35:19] [Server thread/INFO] (Minecraft) Player131 joined the game
+[16:35:19] [Render thread/INFO] (C2ME ClientExtNetworking) Joined server with c2me:ext_render_distance_v1 support
+[16:35:19] [Render thread/INFO] (C2ME ClientExtNetworking) Changing view distance to 16 (play stage)
+[16:35:19] [Download-2/ERROR] (Minecraft) Failed to retrieve profile key pair
+MinecraftClientHttpException[type=HTTP_ERROR, status=401, response=ErrorResponse[path=/player/certificates, error=null, errorMessage=null, details=null]]
+	at knot//com.mojang.authlib.minecraft.client.MinecraftClient.buildHttpException(MinecraftClient.java:170)
+	at knot//com.mojang.authlib.minecraft.client.MinecraftClient.readServiceResponse(MinecraftClient.java:147)
+	at knot//com.mojang.authlib.minecraft.client.MinecraftClient.post(MinecraftClient.java:89)
+	at knot//com.mojang.authlib.yggdrasil.YggdrasilUserApiService.getKeyPair(YggdrasilUserApiService.java:62)
+	at knot//net.minecraft.client.multiplayer.AccountProfileKeyPairManager.fetchProfileKeyPair(AccountProfileKeyPairManager.java:128)
+	at knot//net.minecraft.client.multiplayer.AccountProfileKeyPairManager.lambda$readOrFetchProfileKeyPair$0(AccountProfileKeyPairManager.java:77)
+	at java.base/java.util.concurrent.CompletableFuture$AsyncSupply.run(Unknown Source)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(Unknown Source)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(Unknown Source)
+	at java.base/java.lang.Thread.run(Unknown Source)
+[16:35:19] [Server thread/INFO] (Minecraft) Changing view distance to 16, from 10
+[16:35:19] [Server thread/INFO] (Minecraft) Changing simulation distance to 12, from 0
+[16:35:19] [Server thread/INFO] (Minecraft) [STDOUT]: Player131 render distance has changed to 16
+[16:35:19] [Server thread/INFO] (Minecraft) [STDOUT]: Player131 render distance has changed to 16
+[16:35:19] [Render thread/INFO] (Minecraft) Resizing Dynamic Transforms UBO, capacity limit of 2 reached during a single frame. New capacity will be 4.
+[16:35:19] [Render thread/INFO] (Minecraft) Loaded 2 advancements
+[16:35:19] [Render thread/INFO] (Minecraft) Resizing Dynamic Transforms UBO, capacity limit of 4 reached during a single frame. New capacity will be 8.
+[16:35:19] [Render thread/INFO] (Minecraft) Resizing Dynamic Transforms UBO, capacity limit of 8 reached during a single frame. New capacity will be 16.
+[16:35:20] [Render thread/INFO] (Minecraft) Resizing Chunk Sections UBO, capacity limit of 2 reached during a single frame. New capacity will be 8.
+[16:35:20] [Render thread/INFO] (Minecraft) Resizing Chunk Sections UBO, capacity limit of 8 reached during a single frame. New capacity will be 16.
+[16:35:20] [Render thread/INFO] (Minecraft) Resizing Chunk Sections UBO, capacity limit of 16 reached during a single frame. New capacity will be 32.
+[16:35:20] [Render thread/INFO] (Minecraft) Resizing Chunk Sections UBO, capacity limit of 32 reached during a single frame. New capacity will be 64.
+[16:35:23] [Server thread/WARN] (Minecraft) Can't keep up! Is the server overloaded? Running 3446ms or 68 ticks behind
+[16:35:23] [Render thread/INFO] (Minecraft) Resizing Chunk Sections UBO, capacity limit of 64 reached during a single frame. New capacity will be 128.
+[16:35:25] [Render thread/INFO] (Minecraft) Resizing Chunk Sections UBO, capacity limit of 128 reached during a single frame. New capacity will be 256.
+[16:35:25] [Render thread/INFO] (Minecraft) Resizing Chunk Sections UBO, capacity limit of 256 reached during a single frame. New capacity will be 512.
+[16:35:29] [Render thread/INFO] (Minecraft) Resizing Chunk Sections UBO, capacity limit of 512 reached during a single frame. New capacity will be 1024.
+[16:35:37] [Server thread/INFO] (Minecraft) Saving and pausing game...
+[16:35:37] [Server thread/INFO] (Minecraft) Saving chunks for level 'ServerLevel[New World]'/minecraft:overworld
+[16:35:38] [Server thread/INFO] (Minecraft) Saving chunks for level 'ServerLevel[New World]'/minecraft:the_nether
+[16:35:38] [Server thread/INFO] (Minecraft) Saving chunks for level 'ServerLevel[New World]'/minecraft:the_end
+[16:35:40] [Render thread/INFO] (Minecraft) Resizing Chunk Sections UBO, capacity limit of 1024 reached during a single frame. New capacity will be 2048.
+[16:36:00] [Server thread/WARN] (Minecraft) Can't keep up! Is the server overloaded? Running 2256ms or 45 ticks behind
+[16:36:06] [Server thread/INFO] (Minecraft) Player131 has reached the goal [Sky's the Limit]
+[16:36:06] [Render thread/INFO] (Minecraft) [System] [CHAT] Player131 has reached the goal [Sky's the Limit]
+[16:36:06] [Render thread/INFO] (Minecraft) Loaded 7 advancements
+[16:36:43] [Render thread/INFO] (Minecraft) [System] [CHAT] No entity was found
+[16:36:53] [Server thread/INFO] (Minecraft) [Player131: Applied enchantment Wind Burst III to Player131's item]
+[16:36:53] [Render thread/INFO] (Minecraft) [System] [CHAT] Applied enchantment Wind Burst III to Player131's item
+[16:37:18] [Render thread/INFO] (Minecraft) Resizing Chunk Sections UBO, capacity limit of 2048 reached during a single frame. New capacity will be 4096.
+[16:38:53] [Server thread/INFO] (Minecraft) Villager Villager['Villager'/1743, l='ServerLevel[New World]', x=-474.11, y=72.00, z=-281.65] died, message: 'Villager was smashed by Player131'
+[16:38:53] [Render thread/INFO] (Minecraft) Villager Villager['Villager'/1743, l='ClientLevel', x=-474.14, y=72.00, z=-281.31] died, message: 'Villager died'
+[16:38:53] [Render thread/INFO] (Minecraft) Loaded 46 advancements
+[16:39:23] [Render thread/INFO] (Minecraft) Loaded 46 advancements
+[16:39:27] [Render thread/INFO] (Minecraft) Loaded 56 advancements
+[16:39:44] [Render thread/INFO] (Minecraft) Loaded 56 advancements
+[16:39:53] [Server thread/INFO] (Minecraft) Saving and pausing game...
+[16:39:53] [Server thread/INFO] (Minecraft) Saving chunks for level 'ServerLevel[New World]'/minecraft:overworld
+[16:39:53] [Server thread/INFO] (Minecraft) Saving chunks for level 'ServerLevel[New World]'/minecraft:the_nether
+[16:39:53] [Server thread/INFO] (Minecraft) Saving chunks for level 'ServerLevel[New World]'/minecraft:the_end
+[16:39:53] [Server thread/WARN] (Minecraft) Can't keep up! Is the server overloaded? Running 218457ms or 4369 ticks behind
+[16:40:04] [Server thread/INFO] (Minecraft) Player131 was killed
+[16:40:04] [Render thread/INFO] (Minecraft) [System] [CHAT] Player131 was killed
+[16:40:04] [Server thread/INFO] (Minecraft) Villager Villager['Villager'/1800, l='ServerLevel[New World]', x=-517.82, y=82.00, z=-316.51] died, message: 'Villager was killed'
+[16:40:04] [Server thread/INFO] (Minecraft) Villager Villager['Villager'/1804, l='ServerLevel[New World]', x=-469.38, y=74.47, z=-328.65] died, message: 'Villager was killed'
+[16:40:04] [Server thread/INFO] (Minecraft) Villager Villager['Nitwit'/1805, l='ServerLevel[New World]', x=-475.60, y=75.00, z=-323.12] died, message: 'Nitwit was killed'
+[16:40:04] [Server thread/INFO] (Minecraft) Villager Villager['Villager'/1801, l='ServerLevel[New World]', x=-490.25, y=77.94, z=-321.46] died, message: 'Villager was killed'
+[16:40:04] [Server thread/INFO] (Minecraft) Villager Villager['Villager'/1802, l='ServerLevel[New World]', x=-521.32, y=83.32, z=-323.46] died, message: 'Villager was killed'
+[16:40:04] [Server thread/INFO] (Minecraft) Villager Villager['Villager'/1815, l='ServerLevel[New World]', x=-449.46, y=73.00, z=-330.50] died, message: 'Villager was killed'
+[16:40:04] [Server thread/INFO] (Minecraft) Villager Villager['Villager'/1851, l='ServerLevel[New World]', x=-480.87, y=74.56, z=-357.90] died, message: 'Villager was killed'
+[16:40:04] [Server thread/INFO] (Minecraft) Villager Villager['Villager'/1861, l='ServerLevel[New World]', x=-471.50, y=72.00, z=-368.84] died, message: 'Villager was killed'
+[16:40:04] [Server thread/INFO] (Minecraft) [Player131: Killed 1273 entities]
+[16:40:04] [Render thread/INFO] (Minecraft) [System] [CHAT] Killed 1273 entities
+[16:40:11] [Server thread/INFO] (Minecraft) Saving and pausing game...
+[16:40:11] [Server thread/INFO] (Minecraft) Saving chunks for level 'ServerLevel[New World]'/minecraft:overworld
+[16:40:11] [Server thread/INFO] (Minecraft) Saving chunks for level 'ServerLevel[New World]'/minecraft:the_nether
+[16:40:11] [Server thread/INFO] (Minecraft) Saving chunks for level 'ServerLevel[New World]'/minecraft:the_end
+[16:40:11] [Server thread/WARN] (Minecraft) Can't keep up! Is the server overloaded? Running 2614ms or 52 ticks behind
+[16:40:32] [Server thread/INFO] (Minecraft) Saving and pausing game...
+[16:40:32] [Server thread/INFO] (Minecraft) Saving chunks for level 'ServerLevel[New World]'/minecraft:overworld
+[16:40:32] [Server thread/INFO] (Minecraft) Saving chunks for level 'ServerLevel[New World]'/minecraft:the_nether
+[16:40:32] [Server thread/INFO] (Minecraft) Saving chunks for level 'ServerLevel[New World]'/minecraft:the_end
+[16:40:33] [Server thread/INFO] (Minecraft) Saving and pausing game...
+[16:40:34] [Server thread/INFO] (Minecraft) Saving chunks for level 'ServerLevel[New World]'/minecraft:overworld
+[16:40:34] [Server thread/INFO] (Minecraft) Saving chunks for level 'ServerLevel[New World]'/minecraft:the_nether
+[16:40:34] [Server thread/INFO] (Minecraft) Saving chunks for level 'ServerLevel[New World]'/minecraft:the_end
+[16:40:38] [Server thread/INFO] (Minecraft) Saving and pausing game...
+[16:40:38] [Server thread/INFO] (Minecraft) Saving chunks for level 'ServerLevel[New World]'/minecraft:overworld
+[16:40:38] [Server thread/INFO] (Minecraft) Saving chunks for level 'ServerLevel[New World]'/minecraft:the_nether
+[16:40:38] [Server thread/INFO] (Minecraft) Saving chunks for level 'ServerLevel[New World]'/minecraft:the_end
+[16:40:48] [Server thread/WARN] (Minecraft) Can't keep up! Is the server overloaded? Running 2476ms or 49 ticks behind
+[16:40:53] [Server thread/INFO] (Minecraft) Saving and pausing game...
+[16:40:53] [Server thread/INFO] (Minecraft) Saving chunks for level 'ServerLevel[New World]'/minecraft:overworld
+[16:40:53] [Server thread/INFO] (Minecraft) Saving chunks for level 'ServerLevel[New World]'/minecraft:the_nether
+[16:40:53] [Server thread/INFO] (Minecraft) Saving chunks for level 'ServerLevel[New World]'/minecraft:the_end
+[16:40:54] [Render thread/INFO] (C2ME ClientExtNetworking) Changing view distance to 16 (play stage)
+[16:40:54] [Server thread/INFO] (Minecraft) [STDOUT]: Player131 render distance has changed to 16
+[16:40:56] [Server thread/INFO] (Minecraft) Saving and pausing game...
+[16:40:56] [Server thread/INFO] (Minecraft) Saving chunks for level 'ServerLevel[New World]'/minecraft:overworld
+[16:40:56] [Server thread/INFO] (Minecraft) Saving chunks for level 'ServerLevel[New World]'/minecraft:the_nether
+[16:40:56] [Server thread/INFO] (Minecraft) Saving chunks for level 'ServerLevel[New World]'/minecraft:the_end
+[16:41:31] [Server thread/INFO] (Minecraft) Saving and pausing game...
+[16:41:31] [Server thread/INFO] (Minecraft) Saving chunks for level 'ServerLevel[New World]'/minecraft:overworld
+[16:41:31] [Server thread/INFO] (Minecraft) Saving chunks for level 'ServerLevel[New World]'/minecraft:the_nether
+[16:41:31] [Server thread/INFO] (Minecraft) Saving chunks for level 'ServerLevel[New World]'/minecraft:the_end
+[16:42:21] [Server thread/WARN] (Minecraft) Can't keep up! Is the server overloaded? Running 2711ms or 54 ticks behind
+[16:42:43] [Server thread/INFO] (Minecraft) Saving and pausing game...
+[16:42:43] [Server thread/INFO] (Minecraft) Saving chunks for level 'ServerLevel[New World]'/minecraft:overworld
+[16:42:43] [Server thread/INFO] (Minecraft) Saving chunks for level 'ServerLevel[New World]'/minecraft:the_nether
+[16:42:43] [Server thread/INFO] (Minecraft) Saving chunks for level 'ServerLevel[New World]'/minecraft:the_end
+[16:42:43] [Server thread/WARN] (Minecraft) Can't keep up! Is the server overloaded? Running 7088ms or 141 ticks behind
+[16:43:04] [Server thread/INFO] (Minecraft) Saving and pausing game...
+[16:43:04] [Server thread/INFO] (Minecraft) Saving chunks for level 'ServerLevel[New World]'/minecraft:overworld
+[16:43:04] [Server thread/INFO] (Minecraft) Saving chunks for level 'ServerLevel[New World]'/minecraft:the_nether
+[16:43:04] [Server thread/INFO] (Minecraft) Saving chunks for level 'ServerLevel[New World]'/minecraft:the_end
+[16:43:04] [Server thread/INFO] (Minecraft) Stopping server
+[16:43:04] [Server thread/INFO] (Minecraft) Saving players
+[16:43:04] [Server thread/INFO] (Minecraft) Player131 lost connection: Disconnected
+[16:43:04] [Server thread/INFO] (Minecraft) Player131 left the game
+[16:43:04] [Server thread/INFO] (Minecraft) Stopping singleplayer server as player logged out
+[16:43:04] [Server thread/INFO] (Minecraft) Saving worlds
+[16:43:04] [Server thread/INFO] (Minecraft) ServerLevel[New World]/minecraft:overworld: waiting for 11327 chunks to unload
+[16:43:06] [Server thread/INFO] (Minecraft) Saving chunks for level 'ServerLevel[New World]'/minecraft:overworld
+[16:43:06] [Server thread/INFO] (Minecraft) Saving chunks for level 'ServerLevel[New World]'/minecraft:the_nether
+[16:43:06] [Server thread/INFO] (Minecraft) Saving chunks for level 'ServerLevel[New World]'/minecraft:the_end
+[16:43:06] [Server thread/INFO] (Minecraft) ThreadedAnvilChunkStorage (world): All chunks are saved
+[16:43:06] [Server thread/INFO] (Minecraft) ThreadedAnvilChunkStorage (DIM-1): All chunks are saved
+[16:43:06] [Server thread/INFO] (Minecraft) ThreadedAnvilChunkStorage (DIM1): All chunks are saved
+[16:43:06] [Server thread/INFO] (Minecraft) ThreadedAnvilChunkStorage: All dimensions are saved
+[16:43:06] [C2ME Storage #3/INFO] (C2ME Storage) Storage thread Thread[#106,C2ME Storage #3,8,main] stopped
+[16:43:07] [C2ME Storage #2/INFO] (C2ME Storage) Storage thread Thread[#105,C2ME Storage #2,8,main] stopped
+[16:43:07] [C2ME Storage #1/INFO] (C2ME Storage) Storage thread Thread[#104,C2ME Storage #1,8,main] stopped
+[16:43:07] [C2ME Storage #6/INFO] (C2ME Storage) Storage thread Thread[#112,C2ME Storage #6,8,main] stopped
+[16:43:07] [C2ME Storage #4/INFO] (C2ME Storage) Storage thread Thread[#110,C2ME Storage #4,8,main] stopped
+[16:43:07] [C2ME Storage #5/INFO] (C2ME Storage) Storage thread Thread[#111,C2ME Storage #5,8,main] stopped
+[16:43:07] [C2ME Storage #9/INFO] (C2ME Storage) Storage thread Thread[#115,C2ME Storage #9,8,main] stopped
+[16:43:07] [C2ME Storage #8/INFO] (C2ME Storage) Storage thread Thread[#114,C2ME Storage #8,8,main] stopped
+[16:43:07] [C2ME Storage #7/INFO] (C2ME Storage) Storage thread Thread[#113,C2ME Storage #7,8,main] stopped
+[16:43:08] [Render thread/INFO] (Minecraft) Stopping!

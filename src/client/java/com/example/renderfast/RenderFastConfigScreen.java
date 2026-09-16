@@ -21,6 +21,7 @@ public class RenderFastConfigScreen {
 		ConfigCategory help = builder.getOrCreateCategory(Component.literal("Features & Help"));
 
 		general.addEntry(eb.startBooleanToggle(Component.literal("Enable RenderFast"), config.enabled).setDefaultValue(true).setTooltip(Component.literal("Global toggle for the background generation engine.")).setSaveConsumer(v -> config.enabled = v).build());
+		general.addEntry(eb.startBooleanToggle(Component.literal("Turbo Mode"), config.turboMode).setDefaultValue(false).setTooltip(Component.literal("Bypasses all safety limits. Use with caution!")).setSaveConsumer(v -> config.turboMode = v).build());
 		general.addEntry(eb.startIntSlider(Component.literal("Generation Radius"), config.radius, 10, 2000).setDefaultValue(100).setTooltip(Component.literal("How many chunks out from the center to generate.")).setSaveConsumer(v -> config.radius = v).build());
 		general.addEntry(eb.startEnumSelector(Component.literal("Shape"), RenderFastConfig.Shape.class, config.shape).setDefaultValue(RenderFastConfig.Shape.CIRCLE).setTooltip(Component.literal("Circle is more natural; Square is better for filling world borders.")).setSaveConsumer(v -> config.shape = v).build());
 		general.addEntry(eb.startBooleanToggle(Component.literal("Show HUD"), config.showHud).setDefaultValue(true).setTooltip(Component.literal("Display the progress bar in the top-right corner.")).setSaveConsumer(v -> config.showHud = v).build());
@@ -38,7 +39,6 @@ public class RenderFastConfigScreen {
 		performance.addEntry(eb.startBooleanToggle(Component.literal("Adaptive Throttling"), config.adaptiveThrottling).setDefaultValue(true).setTooltip(Component.literal("Automatically pauses generation if the server becomes too laggy.")).setSaveConsumer(v -> config.adaptiveThrottling = v).build());
 		performance.addEntry(eb.startIntSlider(Component.literal("Work Hours Start"), Integer.parseInt(config.startTime.split(":")[0]), 0, 23).setDefaultValue(0).setSaveConsumer(v -> config.startTime = String.format("%02d:00", v)).build());
 		performance.addEntry(eb.startIntSlider(Component.literal("Work Hours End"), Integer.parseInt(config.endTime.split(":")[0]), 0, 23).setDefaultValue(23).setSaveConsumer(v -> config.endTime = String.format("%02d:59", v)).build());
-		performance.addEntry(eb.startBooleanToggle(Component.literal("Turbo Mode"), config.turboMode).setDefaultValue(false).setTooltip(Component.literal("Bypasses all safety limits. Use with caution!")).setSaveConsumer(v -> config.turboMode = v).build());
 		performance.addEntry(eb.startBooleanToggle(Component.literal("Auto-Turbo (Empty Server)"), config.autoTurboWhenEmpty).setDefaultValue(false).setTooltip(Component.literal("Enables Turbo Mode automatically when no players are online.")).setSaveConsumer(v -> config.autoTurboWhenEmpty = v).build());
 
 		integration.addEntry(eb.startTextField(Component.literal("Discord Webhook URL"), config.discordWebhookUrl).setSaveConsumer(v -> config.discordWebhookUrl = v).build());
