@@ -12,7 +12,7 @@ loom {
 	splitEnvironmentSourceSets()
 
 	mods {
-		"chunkpreload" {
+		"renderfast" {
 			sourceSet sourceSets.main
 			sourceSet sourceSets.client
 		}
