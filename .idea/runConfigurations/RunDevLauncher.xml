@@ -1,0 +1,11 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" factoryName="Application" name="DevLaunchRunner" type="Application">
+    <option name="MAIN_CLASS_NAME" value="com.example.renderfast.DevLaunchRunner"/>
+    <shortenClasspath name="ARGS_FILE"/>
+    <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$"/>
+    <method v="2">
+      <option enabled="true" name="Make"/>
+    </method>
+    <classpathModifications/>
+  </configuration>
+</component>
