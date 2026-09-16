@@ -1,8 +1,11 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration name="Minecraft Client" type="Gradle" factoryName="Gradle" singleton="true">
-    <option name="externalProjectPath" value="$PROJECT_DIR$" />
-    <option name="taskNames" value="runClient" />
-    <option name="scriptParameters" value="--no-daemon --warning-mode all" />
-    <method v="2" />
+  <configuration default="false" factoryName="Application" name="Minecraft Client" type="Application">
+    <option name="MAIN_CLASS_NAME" value="com.example.renderfast.DevLaunchRunner"/>
+    <shortenClasspath name="ARGS_FILE"/>
+    <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$"/>
+    <method v="2">
+      <option enabled="true" name="Make"/>
+    </method>
+    <classpathModifications/>
   </configuration>
 </component>
