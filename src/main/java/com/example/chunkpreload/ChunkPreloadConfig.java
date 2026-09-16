@@ -10,6 +10,8 @@ import java.io.Writer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 
 public class ChunkPreloadConfig {
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
@@ -41,9 +43,13 @@ public class ChunkPreloadConfig {
 
 	public Shape shape = Shape.CIRCLE;
 	public String onCompleteCommand = "";
-	public String targetStatus = "minecraft:full";
-	public boolean preloadNether = false;
-	public boolean preloadEnd = false;
+	public String targetStatus = "minecraft:features";
+	
+	public List<String> dimensions = new ArrayList<>(List.of("minecraft:overworld", "minecraft:the_nether", "minecraft:the_end"));
+	
+	public int playerSafetyRadius = 0;
+	public boolean autoTurboWhenEmpty = false;
+	public boolean aggressiveUnload = false;
 
 	public boolean onlyPreloadWhenEmpty = false;
 	public int consoleLogIntervalSeconds = 30;
@@ -54,6 +60,11 @@ public class ChunkPreloadConfig {
 	public boolean notifyMapMods = true;
 	public int restartAfterChunks = 0;
 	public boolean structureOnlyMode = false;
+
+	// NEW FEATURES
+	public List<String> pointsOfInterest = new ArrayList<>(); // Format: "x,z"
+	public boolean dryRunMode = false;
+	public boolean lightingFixMode = false;
 
 	public static ChunkPreloadConfig load() {
 		Path path = FabricLoader.getInstance().getConfigDir().resolve(FILE_NAME);

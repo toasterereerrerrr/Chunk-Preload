@@ -21,8 +21,10 @@ public class ChunkPreloadClient implements ClientModInitializer {
 	private static int done = 0;
 	private static int total = 0;
 	private static boolean active = false;
+	private static boolean paused = false;
 	private static String dimension = "minecraft:overworld";
 	private static float chunksPerSecond = 0;
+	private static String pauseReason = "";
 	private static long completedAtMillis = -1;
 	private static long worldJoinTime = -1;
 	private static long startTime = -1;
@@ -53,12 +55,14 @@ public class ChunkPreloadClient implements ClientModInitializer {
 			done = payload.done();
 			total = payload.total();
 			active = payload.active();
+			paused = payload.paused();
 			dimension = payload.dimension();
 			chunksPerSecond = payload.chunksPerSecond();
+			pauseReason = payload.pauseReason();
 
 			if (total > 0 && done < total) {
 				completedAtMillis = -1;
-				if (startTime < 0 && active) {
+				if (startTime < 0 && active && !paused) {
 					startTime = System.currentTimeMillis();
 					startDone = done;
 				}
@@ -78,7 +82,7 @@ public class ChunkPreloadClient implements ClientModInitializer {
 		ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> worldJoinTime = System.currentTimeMillis());
 
 		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
-			worldJoinTime = -1; completedAtMillis = -1; done = 0; total = 0; active = false; startTime = -1; cachedLabel = "";
+			worldJoinTime = -1; completedAtMillis = -1; done = 0; total = 0; active = false; paused = false; startTime = -1; cachedLabel = ""; pauseReason = "";
 		});
 
 		ClientTickEvents.END_CLIENT_TICK.register(client -> {
@@ -94,7 +98,7 @@ public class ChunkPreloadClient implements ClientModInitializer {
 		if (font == null) return;
 
 		String etaStr = "";
-		if (startTime > 0 && done > startDone) {
+		if (startTime > 0 && done > startDone && !paused) {
 			long elapsed = System.currentTimeMillis() - startTime;
 			double chunksPerMs = (double) (done - startDone) / elapsed;
 			if (chunksPerMs > 0) {
@@ -106,11 +110,18 @@ public class ChunkPreloadClient implements ClientModInitializer {
 		String dimStr = dimension.replace("minecraft:", "");
 		String shapeStr = ChunkPreloadMod.CONFIG.shape.toString().toLowerCase();
 		int percent = (total > 0) ? (int) (((float) done / total) * 100f) : 0;
+		
+		String status;
+		if (paused) {
+			status = pauseReason.isEmpty() ? " (PAUSED)" : " (PAUSED: " + pauseReason + ")";
+		} else {
+			status = "";
+		}
 
 		if (ChunkPreloadMod.CONFIG.showHudMetrics) {
-			cachedLabel = String.format("Preloading %s (%s): %d/%d (%d%%) | %.1f ch/s%s", dimStr, shapeStr, done, total, percent, chunksPerSecond, etaStr);
+			cachedLabel = String.format("Preloading %s (%s): %d/%d (%d%%)%s | %.1f ch/s%s", dimStr, shapeStr, done, total, percent, status, chunksPerSecond, etaStr);
 		} else {
-			cachedLabel = String.format("Preloading %s (%s): %d/%d (%d%%)", dimStr, shapeStr, done, total, percent);
+			cachedLabel = String.format("Preloading %s (%s): %d/%d (%d%%)%s", dimStr, shapeStr, done, total, percent, status);
 		}
 		cachedLabelWidth = font.width(cachedLabel);
 	}

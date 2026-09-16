@@ -27,6 +27,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.border.WorldBorder;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.level.storage.LevelResource;
+import net.minecraft.core.particles.ParticleTypes;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -57,6 +58,7 @@ public class ChunkPreloadMod implements ModInitializer {
 	private static long lastTime = 0;
 	private static float chunksPerSecond = 0;
 	private static long lastConsoleLogTime = 0;
+	private static String currentPauseReason = "";
 
 	private static int chunksGeneratedThisSession = 0;
 	private static long benchmarkStartTime = 0;
@@ -108,6 +110,24 @@ public class ChunkPreloadMod implements ModInitializer {
 								return 1;
 							})));
 
+			root.then(literal("pause")
+					.executes(context -> {
+						ensureState(context.getSource().getServer());
+						state.setPaused(true);
+						currentPauseReason = "MANUAL";
+						context.getSource().sendSuccess(() -> Component.literal("Preloading paused"), true);
+						return 1;
+					}));
+
+			root.then(literal("resume")
+					.executes(context -> {
+						ensureState(context.getSource().getServer());
+						state.setPaused(false);
+						currentPauseReason = "";
+						context.getSource().sendSuccess(() -> Component.literal("Preloading resumed"), true);
+						return 1;
+					}));
+
 			root.then(literal("border")
 					.executes(context -> {
 						ServerLevel level = context.getSource().getLevel();
@@ -135,6 +155,22 @@ public class ChunkPreloadMod implements ModInitializer {
 						return 1;
 					}));
 
+			root.then(literal("estimate")
+					.executes(context -> {
+						long sizeBytes = totalChunks * 10240L; // Estimate 10KB per chunk
+						double sizeMb = sizeBytes / (1024.0 * 1024.0);
+						context.getSource().sendSuccess(() -> Component.literal(String.format("Estimate: %d chunks will take approx %.2f MB of disk space.", totalChunks, sizeMb)), false);
+						return 1;
+					}));
+
+			root.then(literal("dryrun")
+					.executes(context -> {
+						CONFIG.dryRunMode = !CONFIG.dryRunMode;
+						CONFIG.save();
+						context.getSource().sendSuccess(() -> Component.literal("Dry Run Mode: " + (CONFIG.dryRunMode ? "ON" : "OFF")), true);
+						return 1;
+					}));
+
 			root.then(literal("stop")
 					.executes(context -> {
 						ensureState(context.getSource().getServer());
@@ -159,8 +195,9 @@ public class ChunkPreloadMod implements ModInitializer {
 						} else if (state.completed) {
 							context.getSource().sendSuccess(() -> Component.literal("Completed: " + state.doneCount + "/" + totalChunks), false);
 						} else {
-							context.getSource().sendSuccess(() -> Component.literal(String.format("Progress: %d/%d (Turbo: %b, Dim: %s, Speed: %.1f ch/s)", 
-									state.doneCount, totalChunks, CONFIG.turboMode, state.dimension, chunksPerSecond)), false);
+							String p = state.paused ? " (PAUSED: " + currentPauseReason + ")" : "";
+							context.getSource().sendSuccess(() -> Component.literal(String.format("Progress: %d/%d (Turbo: %b, Dim: %s, Speed: %.1f ch/s)%s", 
+									state.doneCount, totalChunks, CONFIG.turboMode, state.dimension, chunksPerSecond, p)), false);
 						}
 						return 1;
 					}));
@@ -200,6 +237,7 @@ public class ChunkPreloadMod implements ModInitializer {
 		inFlightIndices.clear();
 		completedIndices.clear();
 		pendingCompletionQueue.clear();
+		tickCounter = 0;
 		lastBroadcastDone = -1;
 		lastBroadcastActive = false;
 		refillTaskPending.set(false);
@@ -236,17 +274,38 @@ public class ChunkPreloadMod implements ModInitializer {
 
 		processCompletions(currentLevel);
 
-		if (CONFIG.enabled) {
+		if (CONFIG.enabled && !state.paused) {
 			updateCps();
 			handleConsoleLogging();
 
-			boolean tooManyPlayers = CONFIG.onlyPreloadWhenEmpty && server.getPlayerCount() > 0;
-			boolean lowDisk = isLowDiskSpace(server);
-			boolean serverIsBusy = !CONFIG.turboMode && (CONFIG.adaptiveThrottling
-					&& server.getAverageTickTimeNanos() > (long) (CONFIG.busyTickThresholdMs * 1_000_000L));
-			boolean lowTps = !CONFIG.turboMode && (1000.0 / (server.getAverageTickTimeNanos() / 1_000_000.0)) < CONFIG.minTpsThreshold;
+			if (CONFIG.dryRunMode) {
+				showDryRunParticles(currentLevel);
+				currentPauseReason = "DRY RUN";
+				broadcastProgress(server);
+				return;
+			}
 
-			if (!isLowMemory() && (CONFIG.turboMode || (!serverIsBusy && !tooManyPlayers && !lowTps && !lowDisk))) {
+			if (CONFIG.playerSafetyRadius > 0) {
+				requestSafetyChunks(server);
+			}
+
+			boolean empty = server.getPlayerCount() == 0;
+			boolean isTurbo = CONFIG.turboMode || (CONFIG.autoTurboWhenEmpty && empty);
+			boolean tooManyPlayers = CONFIG.onlyPreloadWhenEmpty && !empty;
+			boolean lowDisk = isLowDiskSpace(server);
+			boolean lowMemory = isLowMemory();
+			boolean serverIsBusy = !isTurbo && (CONFIG.adaptiveThrottling
+					&& server.getAverageTickTimeNanos() > (long) (CONFIG.busyTickThresholdMs * 1_000_000L));
+			boolean lowTps = !isTurbo && (1000.0 / (server.getAverageTickTimeNanos() / 1_000_000.0)) < CONFIG.minTpsThreshold;
+
+			if (lowMemory) currentPauseReason = "LOW RAM";
+			else if (tooManyPlayers) currentPauseReason = "PLAYERS ONLINE";
+			else if (lowDisk) currentPauseReason = "LOW DISK";
+			else if (serverIsBusy) currentPauseReason = "BUSY TICK";
+			else if (lowTps) currentPauseReason = "LOW TPS";
+			else currentPauseReason = "";
+
+			if (!lowMemory && (isTurbo || (!serverIsBusy && !tooManyPlayers && !lowTps && !lowDisk))) {
 				requestMoreChunks(currentLevel, 64);
 			}
 
@@ -254,6 +313,8 @@ public class ChunkPreloadMod implements ModInitializer {
 				finishDimension(server);
 				return;
 			}
+		} else if (state.paused) {
+			currentPauseReason = "MANUAL";
 		}
 
 		if (++tickCounter >= BROADCAST_INTERVAL_TICKS) {
@@ -262,28 +323,51 @@ public class ChunkPreloadMod implements ModInitializer {
 		}
 	}
 
+	private void showDryRunParticles(ServerLevel level) {
+		if (tickCounter % 20 != 0) return;
+		int r = CONFIG.radius;
+		// Circle corners
+		int[] dx = {r, -r, 0, 0};
+		int[] dz = {0, 0, r, -r};
+		for (int i = 0; i < 4; i++) {
+			int x = (state.centerX + dx[i]) << 4;
+			int z = (state.centerZ + dz[i]) << 4;
+			level.sendParticles(ParticleTypes.HAPPY_VILLAGER, x + 8, 100, z + 8, 50, 2, 2, 2, 0.1);
+		}
+	}
+
+	private void requestSafetyChunks(MinecraftServer server) {
+		for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+			ServerLevel level = (ServerLevel) player.level();
+			ChunkPos center = player.chunkPosition();
+			int r = CONFIG.playerSafetyRadius;
+			for (int dx = -r; dx <= r; dx++) {
+				for (int dz = -r; dz <= r; dz++) {
+					level.getChunkSource().addTicketWithRadius(TicketType.FORCED, new ChunkPos(center.x() + dx, center.z() + dz), 0);
+				}
+			}
+		}
+	}
+
 	private void finishDimension(MinecraftServer server) {
 		if (state == null) return;
 		LOGGER.info("Chunk preload complete for {}: {} chunks generated", state.dimension, totalChunks);
 		sendDiscordWebhook("Chunk preloading complete for " + state.dimension + ": " + totalChunks + " chunks");
 		
-		boolean nextDimStarted = false;
-		String overworld = Level.OVERWORLD.identifier().toString();
-		String nether = Level.NETHER.identifier().toString();
-
-		if (state.dimension.equals(overworld) && CONFIG.preloadNether) {
-			ServerLevel next = server.getLevel(Level.NETHER);
-			if (next != null) { startPreload(next, state.centerX, state.centerZ); nextDimStarted = true; }
-		} else if (state.dimension.equals(nether) && CONFIG.preloadEnd) {
-			ServerLevel next = server.getLevel(Level.END);
-			if (next != null) { startPreload(next, state.centerX, state.centerZ); nextDimStarted = true; }
+		int currentIndex = CONFIG.dimensions.indexOf(state.dimension);
+		if (currentIndex >= 0 && currentIndex < CONFIG.dimensions.size() - 1) {
+			String nextDim = CONFIG.dimensions.get(currentIndex + 1);
+			ServerLevel next = getLevelForDimension(server, nextDim);
+			if (next != null) {
+				startPreload(next, state.centerX, state.centerZ);
+				broadcastProgress(server);
+				return;
+			}
 		}
 
-		if (!nextDimStarted) {
-			state.markCompleted();
-			if (!CONFIG.onCompleteCommand.isEmpty()) {
-				server.getCommands().performPrefixedCommand(server.createCommandSourceStack(), CONFIG.onCompleteCommand);
-			}
+		state.markCompleted();
+		if (!CONFIG.onCompleteCommand.isEmpty()) {
+			server.getCommands().performPrefixedCommand(server.createCommandSourceStack(), CONFIG.onCompleteCommand);
 		}
 		broadcastProgress(server);
 	}
@@ -358,7 +442,9 @@ public class ChunkPreloadMod implements ModInitializer {
 	private static boolean isLowMemory() {
 		Runtime runtime = Runtime.getRuntime();
 		double used = (double) (runtime.totalMemory() - runtime.freeMemory()) / runtime.maxMemory();
-		return used > CONFIG.memoryUsageThreshold;
+		boolean low = used > CONFIG.memoryUsageThreshold;
+		if (low && CONFIG.aggressiveUnload) System.gc();
+		return low;
 	}
 
 	private static void processCompletions(ServerLevel overworld) {
@@ -367,24 +453,15 @@ public class ChunkPreloadMod implements ModInitializer {
 		boolean changed = false;
 		while ((completedIndex = pendingCompletionQueue.poll()) != null) {
 			if (completedIndex < 0 || completedIndex >= totalChunks) continue;
-			
 			int chunkX = state.centerX + offsetX[completedIndex];
 			int chunkZ = state.centerZ + offsetZ[completedIndex];
 			overworld.getChunkSource().removeTicketWithRadius(TicketType.FORCED, new ChunkPos(chunkX, chunkZ), 0);
-
 			if (inFlightIndices.remove(completedIndex)) {
-				completedIndices.add(completedIndex);
-				changed = true;
-				chunksGeneratedThisSession++;
-				if (CONFIG.restartAfterChunks > 0 && chunksGeneratedThisSession >= CONFIG.restartAfterChunks) {
-					overworld.getServer().halt(false);
-				}
+				completedIndices.add(completedIndex); changed = true; chunksGeneratedThisSession++;
+				if (CONFIG.restartAfterChunks > 0 && chunksGeneratedThisSession >= CONFIG.restartAfterChunks) overworld.getServer().halt(false);
 			}
 		}
-		if (changed) {
-			state.doneCount = Math.min(completedIndices.size(), totalChunks);
-			state.setDirty();
-		}
+		if (changed) { state.doneCount = Math.min(completedIndices.size(), totalChunks); state.setDirty(); }
 	}
 
 	private static void requestMoreChunks(ServerLevel overworld, int limit) {
@@ -392,16 +469,24 @@ public class ChunkPreloadMod implements ModInitializer {
 		int maxConcurrency = CONFIG.maxConcurrentAsyncChunks;
 		
 		if (cachedTargetStatus == null) {
-			String statusId = CONFIG.structureOnlyMode ? "minecraft:structure_starts" : CONFIG.targetStatus;
+			String statusId;
+			if (CONFIG.lightingFixMode) statusId = "minecraft:light";
+			else if (CONFIG.structureOnlyMode) statusId = "minecraft:structure_starts";
+			else statusId = CONFIG.targetStatus;
+			
 			cachedTargetStatus = BuiltInRegistries.CHUNK_STATUS.get(Identifier.parse(statusId)).map(Holder.Reference::value).orElse(ChunkStatus.FULL);
 		}
 		ChunkStatus status = cachedTargetStatus;
+
+		// POINT OF INTEREST QUEUE
+		if (!CONFIG.pointsOfInterest.isEmpty() && nextRequestIndex == 0) {
+			processPOIs(overworld, status);
+		}
 
 		int requested = 0;
 		while (inFlightIndices.size() < maxConcurrency && nextRequestIndex < totalChunks && requested < limit) {
 			int index = nextRequestIndex++;
 			if (completedIndices.contains(index)) continue;
-			
 			requested++;
 			ChunkPos chunkPos = new ChunkPos(state.centerX + offsetX[index], state.centerZ + offsetZ[index]);
 			inFlightIndices.add(index);
@@ -422,13 +507,24 @@ public class ChunkPreloadMod implements ModInitializer {
 		}
 	}
 
+	private static void processPOIs(ServerLevel level, ChunkStatus status) {
+		for (String poi : CONFIG.pointsOfInterest) {
+			try {
+				String[] parts = poi.split(",");
+				int cx = Integer.parseInt(parts[0].trim()) >> 4;
+				int cz = Integer.parseInt(parts[1].trim()) >> 4;
+				level.getChunkSource().addTicketWithRadius(TicketType.FORCED, new ChunkPos(cx, cz), 0);
+				level.getChunkSource().getChunkFuture(cx, cz, status, true);
+			} catch (Exception ignored) {}
+		}
+	}
+
 	private static void broadcastProgress(MinecraftServer server) {
 		if (state == null) return;
 		boolean active = CONFIG.enabled && state.started && !state.completed;
 		if (state.doneCount == lastBroadcastDone && active == lastBroadcastActive) return;
-		
 		lastBroadcastDone = state.doneCount; lastBroadcastActive = active;
-		PreloadProgressPayload payload = new PreloadProgressPayload(state.doneCount, totalChunks, active, state.dimension, chunksPerSecond);
+		PreloadProgressPayload payload = new PreloadProgressPayload(state.doneCount, totalChunks, active, state.paused, state.dimension, chunksPerSecond, currentPauseReason);
 		for (ServerPlayer player : server.getPlayerList().getPlayers()) {
 			if (ServerPlayNetworking.canSend(player, PreloadProgressPayload.TYPE)) ServerPlayNetworking.send(player, payload);
 		}
@@ -436,7 +532,7 @@ public class ChunkPreloadMod implements ModInitializer {
 
 	private static void sendProgress(ServerPlayer player) {
 		if (state == null) return;
-		PreloadProgressPayload payload = new PreloadProgressPayload(state.doneCount, totalChunks, CONFIG.enabled && state.started && !state.completed, state.dimension, chunksPerSecond);
+		PreloadProgressPayload payload = new PreloadProgressPayload(state.doneCount, totalChunks, CONFIG.enabled && state.started && !state.completed, state.paused, state.dimension, chunksPerSecond, currentPauseReason);
 		if (ServerPlayNetworking.canSend(player, PreloadProgressPayload.TYPE)) ServerPlayNetworking.send(player, payload);
 	}
 
@@ -444,12 +540,9 @@ public class ChunkPreloadMod implements ModInitializer {
 
 	private static void buildSpiral(int radius) {
 		int side = 2 * radius + 1;
-		short[] tmpX = new short[side * side];
-		short[] tmpZ = new short[side * side];
-		int count = 0;
-		long radiusSquared = (long) radius * radius;
+		short[] tmpX = new short[side * side]; short[] tmpZ = new short[side * side];
+		int count = 0; long radiusSquared = (long) radius * radius;
 		tmpX[count] = 0; tmpZ[count] = 0; count++;
-
 		for (int r = 1; r <= radius; r++) {
 			for (int dx = -r; dx <= r; dx++) {
 				if (CONFIG.shape == ChunkPreloadConfig.Shape.SQUARE || ((long) dx * dx + (long) r * r <= radiusSquared)) {
@@ -464,9 +557,7 @@ public class ChunkPreloadMod implements ModInitializer {
 				}
 			}
 		}
-		offsetX = Arrays.copyOf(tmpX, count);
-		offsetZ = Arrays.copyOf(tmpZ, count);
-		totalChunks = count;
+		offsetX = Arrays.copyOf(tmpX, count); offsetZ = Arrays.copyOf(tmpZ, count); totalChunks = count;
 		LOGGER.info("Chunk Preloader configured for a {}-chunk {} ({} chunks total)", radius, CONFIG.shape, totalChunks);
 	}
 }

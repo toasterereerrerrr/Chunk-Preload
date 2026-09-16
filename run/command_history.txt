@@ -14,3 +14,7 @@
 /gamemode survival
 /gamemode creative
 /gamemode survival
+/give Player669 minecraft:leather_boots 1
+/gamemode creative
+/gamemode survival
+/gamemode creative

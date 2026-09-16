@@ -6,6 +6,8 @@ import me.shedaniel.clothconfig2.api.ConfigEntryBuilder;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 
+import java.util.List;
+
 public class ChunkPreloadConfigScreen {
 	public static Screen create(Screen parent) {
 		ChunkPreloadConfig config = ChunkPreloadMod.CONFIG;
@@ -43,12 +45,6 @@ public class ChunkPreloadConfigScreen {
 		general.addEntry(entryBuilder.startEnumSelector(Component.literal("Shape"), ChunkPreloadConfig.Shape.class, config.shape)
 				.setDefaultValue(ChunkPreloadConfig.Shape.CIRCLE).setSaveConsumer(v -> config.shape = v).build());
 
-		general.addEntry(entryBuilder.startBooleanToggle(Component.literal("Preload Nether"), config.preloadNether)
-				.setDefaultValue(false).setSaveConsumer(v -> config.preloadNether = v).build());
-
-		general.addEntry(entryBuilder.startBooleanToggle(Component.literal("Preload End"), config.preloadEnd)
-				.setDefaultValue(false).setSaveConsumer(v -> config.preloadEnd = v).build());
-
 		general.addEntry(entryBuilder.startBooleanToggle(Component.literal("Show progress HUD"), config.showHud)
 				.setDefaultValue(true).setSaveConsumer(v -> config.showHud = v).build());
 
@@ -58,8 +54,53 @@ public class ChunkPreloadConfigScreen {
 		general.addEntry(entryBuilder.startBooleanToggle(Component.literal("Show HUD metrics"), config.showHudMetrics)
 				.setDefaultValue(false).setSaveConsumer(v -> config.showHudMetrics = v).build());
 
-		advanced.addEntry(entryBuilder.startTextField(Component.literal("Target Status"), config.targetStatus)
-				.setDefaultValue("minecraft:full").setSaveConsumer(v -> config.targetStatus = v).build());
+		advanced.addEntry(entryBuilder.startStringDropdownMenu(Component.literal("Target Status"), config.targetStatus)
+				.setSelections(List.of(
+						"minecraft:empty",
+						"minecraft:structure_starts",
+						"minecraft:structure_references",
+						"minecraft:biomes",
+						"minecraft:noise",
+						"minecraft:surface",
+						"minecraft:carvers",
+						"minecraft:liquid_carvers",
+						"minecraft:features",
+						"minecraft:initialize_light",
+						"minecraft:light",
+						"minecraft:spawn",
+						"minecraft:full"
+				))
+				.setDefaultValue("minecraft:features")
+				.setTooltip(Component.literal("Controls how far each chunk generates. 'features' is recommended for maximum speed without losing terrain detail."))
+				.setSaveConsumer(v -> config.targetStatus = v).build());
+		
+		advanced.addEntry(entryBuilder.startStrList(Component.literal("Dimension List"), config.dimensions)
+				.setDefaultValue(List.of("minecraft:overworld", "minecraft:the_nether", "minecraft:the_end"))
+				.setSaveConsumer(v -> config.dimensions = v).build());
+
+		advanced.addEntry(entryBuilder.startStrList(Component.literal("Points of Interest"), config.pointsOfInterest)
+				.setTooltip(Component.literal("Format: 'x,z'. Chunks at these locations will be generated first."))
+				.setSaveConsumer(v -> config.pointsOfInterest = v).build());
+
+		advanced.addEntry(entryBuilder.startBooleanToggle(Component.literal("Dry Run Mode"), config.dryRunMode)
+				.setDefaultValue(false).setTooltip(Component.literal("If on, generation is paused and particles show the pregen area corners."))
+				.setSaveConsumer(v -> config.dryRunMode = v).build());
+
+		advanced.addEntry(entryBuilder.startBooleanToggle(Component.literal("Lighting Fix Mode"), config.lightingFixMode)
+				.setDefaultValue(false).setTooltip(Component.literal("Only runs the lighting engine. Useful for fixing dark/black chunks."))
+				.setSaveConsumer(v -> config.lightingFixMode = v).build());
+
+		advanced.addEntry(entryBuilder.startIntSlider(Component.literal("Player Safety Radius"), config.playerSafetyRadius, 0, 16)
+				.setDefaultValue(0).setTooltip(Component.literal("Automatically pregen chunks around all online players. 0 to disable."))
+				.setSaveConsumer(v -> config.playerSafetyRadius = v).build());
+
+		advanced.addEntry(entryBuilder.startBooleanToggle(Component.literal("Auto Turbo When Empty"), config.autoTurboWhenEmpty)
+				.setDefaultValue(false).setTooltip(Component.literal("Automatically enable Turbo Mode when no players are online."))
+				.setSaveConsumer(v -> config.autoTurboWhenEmpty = v).build());
+
+		advanced.addEntry(entryBuilder.startBooleanToggle(Component.literal("Aggressive Memory Flush"), config.aggressiveUnload)
+				.setDefaultValue(false).setTooltip(Component.literal("Force Java to cleanup memory when usage is high. Might cause small freezes."))
+				.setSaveConsumer(v -> config.aggressiveUnload = v).build());
 
 		advanced.addEntry(entryBuilder.startBooleanToggle(Component.literal("Immediate Refill"), config.immediateRefill)
 				.setDefaultValue(true).setSaveConsumer(v -> config.immediateRefill = v).build());
