@@ -21,6 +21,7 @@ Chunk Preloader eliminates "chunk-loading stutter" by pre-generating terrain bef
 *   **Lighting Fix Mode**: A specialized mode that only runs the lighting engine. Perfect for fixing dark or black chunks in already generated areas.
 *   **Dry Run Preview**: Use particles to visualize the corners of your pregen area before committing CPU time.
 *   **Disk Usage Estimation**: Get an estimate of the final file size before starting large pregen runs.
+*   **Completion Reports**: Play a sound and post a detailed summary (Time, Speed, Chunks) to console and Discord when a run finishes.
 *   **Player Safety Bubble**: Automatically force-loads a small radius around online players in real-time, ensuring their local environment is always ready before they reach it.
 *   **Universal Support (Server-Side)**: Only needs to be installed on the server. Clients joining without the mod can still play perfectly, while those with it get a beautiful real-time progress HUD.
 *   **Smart and Dynamic Throttling**: 
@@ -43,6 +44,7 @@ All commands require OP level 2.
 | /chunkpreload start <radius> <x> <z> | Starts preloading around specific coordinates. |
 | /chunkpreload pause | Temporarily halts generation without losing progress. |
 | /chunkpreload resume | Continues a paused pregeneration. |
+| /chunkpreload reset | Clears progress for the current dimension to re-run. |
 | /chunkpreload border | Automatically preloads everything inside the world border. |
 | /chunkpreload estimate | Shows estimated disk space usage for the current run. |
 | /chunkpreload dryrun | Toggles Dry Run mode (shows area corners via particles). |

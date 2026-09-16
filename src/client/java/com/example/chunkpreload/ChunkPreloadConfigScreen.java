@@ -56,22 +56,13 @@ public class ChunkPreloadConfigScreen {
 
 		advanced.addEntry(entryBuilder.startStringDropdownMenu(Component.literal("Target Status"), config.targetStatus)
 				.setSelections(List.of(
-						"minecraft:empty",
-						"minecraft:structure_starts",
-						"minecraft:structure_references",
-						"minecraft:biomes",
-						"minecraft:noise",
-						"minecraft:surface",
-						"minecraft:carvers",
-						"minecraft:liquid_carvers",
-						"minecraft:features",
-						"minecraft:initialize_light",
-						"minecraft:light",
-						"minecraft:spawn",
-						"minecraft:full"
+						"minecraft:empty", "minecraft:structure_starts", "minecraft:structure_references",
+						"minecraft:biomes", "minecraft:noise", "minecraft:surface", "minecraft:carvers",
+						"minecraft:liquid_carvers", "minecraft:features", "minecraft:initialize_light",
+						"minecraft:light", "minecraft:spawn", "minecraft:full"
 				))
 				.setDefaultValue("minecraft:features")
-				.setTooltip(Component.literal("Controls how far each chunk generates. 'features' is recommended for maximum speed without losing terrain detail."))
+				.setTooltip(Component.literal("Recommended: 'minecraft:features' for 2x faster terrain gen."))
 				.setSaveConsumer(v -> config.targetStatus = v).build());
 		
 		advanced.addEntry(entryBuilder.startStrList(Component.literal("Dimension List"), config.dimensions)
@@ -79,28 +70,26 @@ public class ChunkPreloadConfigScreen {
 				.setSaveConsumer(v -> config.dimensions = v).build());
 
 		advanced.addEntry(entryBuilder.startStrList(Component.literal("Points of Interest"), config.pointsOfInterest)
-				.setTooltip(Component.literal("Format: 'x,z'. Chunks at these locations will be generated first."))
+				.setTooltip(Component.literal("Format: 'x,z'. Generated first."))
 				.setSaveConsumer(v -> config.pointsOfInterest = v).build());
 
 		advanced.addEntry(entryBuilder.startBooleanToggle(Component.literal("Dry Run Mode"), config.dryRunMode)
-				.setDefaultValue(false).setTooltip(Component.literal("If on, generation is paused and particles show the pregen area corners."))
+				.setDefaultValue(false).setTooltip(Component.literal("Show area corners with particles without generating."))
 				.setSaveConsumer(v -> config.dryRunMode = v).build());
 
 		advanced.addEntry(entryBuilder.startBooleanToggle(Component.literal("Lighting Fix Mode"), config.lightingFixMode)
-				.setDefaultValue(false).setTooltip(Component.literal("Only runs the lighting engine. Useful for fixing dark/black chunks."))
+				.setDefaultValue(false).setTooltip(Component.literal("Only run light engine (very fast). Fixes black chunks."))
 				.setSaveConsumer(v -> config.lightingFixMode = v).build());
 
 		advanced.addEntry(entryBuilder.startIntSlider(Component.literal("Player Safety Radius"), config.playerSafetyRadius, 0, 16)
-				.setDefaultValue(0).setTooltip(Component.literal("Automatically pregen chunks around all online players. 0 to disable."))
+				.setDefaultValue(0).setTooltip(Component.literal("Pregen around all online players."))
 				.setSaveConsumer(v -> config.playerSafetyRadius = v).build());
 
 		advanced.addEntry(entryBuilder.startBooleanToggle(Component.literal("Auto Turbo When Empty"), config.autoTurboWhenEmpty)
-				.setDefaultValue(false).setTooltip(Component.literal("Automatically enable Turbo Mode when no players are online."))
-				.setSaveConsumer(v -> config.autoTurboWhenEmpty = v).build());
+				.setDefaultValue(false).setSaveConsumer(v -> config.autoTurboWhenEmpty = v).build());
 
 		advanced.addEntry(entryBuilder.startBooleanToggle(Component.literal("Aggressive Memory Flush"), config.aggressiveUnload)
-				.setDefaultValue(false).setTooltip(Component.literal("Force Java to cleanup memory when usage is high. Might cause small freezes."))
-				.setSaveConsumer(v -> config.aggressiveUnload = v).build());
+				.setDefaultValue(false).setSaveConsumer(v -> config.aggressiveUnload = v).build());
 
 		advanced.addEntry(entryBuilder.startBooleanToggle(Component.literal("Immediate Refill"), config.immediateRefill)
 				.setDefaultValue(true).setSaveConsumer(v -> config.immediateRefill = v).build());

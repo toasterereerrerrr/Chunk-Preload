@@ -28,6 +28,8 @@ import net.minecraft.world.level.border.WorldBorder;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.level.storage.LevelResource;
 import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -61,6 +63,7 @@ public class ChunkPreloadMod implements ModInitializer {
 	private static String currentPauseReason = "";
 
 	private static int chunksGeneratedThisSession = 0;
+	private static long sessionStartTime = 0;
 	private static long benchmarkStartTime = 0;
 	private static boolean isBenchmarking = false;
 
@@ -128,6 +131,15 @@ public class ChunkPreloadMod implements ModInitializer {
 						return 1;
 					}));
 
+			root.then(literal("reset")
+					.executes(context -> {
+						ensureState(context.getSource().getServer());
+						BlockPos pos = BlockPos.containing(context.getSource().getPosition());
+						startPreload(context.getSource().getLevel(), pos.getX() >> 4, pos.getZ() >> 4);
+						context.getSource().sendSuccess(() -> Component.literal("Pregen progress reset for current dimension."), true);
+						return 1;
+					}));
+
 			root.then(literal("border")
 					.executes(context -> {
 						ServerLevel level = context.getSource().getLevel();
@@ -157,7 +169,7 @@ public class ChunkPreloadMod implements ModInitializer {
 
 			root.then(literal("estimate")
 					.executes(context -> {
-						long sizeBytes = totalChunks * 10240L; // Estimate 10KB per chunk
+						long sizeBytes = totalChunks * 10240L;
 						double sizeMb = sizeBytes / (1024.0 * 1024.0);
 						context.getSource().sendSuccess(() -> Component.literal(String.format("Estimate: %d chunks will take approx %.2f MB of disk space.", totalChunks, sizeMb)), false);
 						return 1;
@@ -326,7 +338,6 @@ public class ChunkPreloadMod implements ModInitializer {
 	private void showDryRunParticles(ServerLevel level) {
 		if (tickCounter % 20 != 0) return;
 		int r = CONFIG.radius;
-		// Circle corners
 		int[] dx = {r, -r, 0, 0};
 		int[] dz = {0, 0, r, -r};
 		for (int i = 0; i < 4; i++) {
@@ -351,8 +362,13 @@ public class ChunkPreloadMod implements ModInitializer {
 
 	private void finishDimension(MinecraftServer server) {
 		if (state == null) return;
-		LOGGER.info("Chunk preload complete for {}: {} chunks generated", state.dimension, totalChunks);
-		sendDiscordWebhook("Chunk preloading complete for " + state.dimension + ": " + totalChunks + " chunks");
+		long timeTaken = (System.currentTimeMillis() - sessionStartTime) / 1000;
+		String report = String.format("Chunk preload complete for %s: %d chunks in %ds (Avg: %.1f ch/s)", 
+				state.dimension, totalChunks, timeTaken, (float) totalChunks / Math.max(1, timeTaken));
+		
+		LOGGER.info(report);
+		sendDiscordWebhook(report);
+		playCompletionSound(server);
 		
 		int currentIndex = CONFIG.dimensions.indexOf(state.dimension);
 		if (currentIndex >= 0 && currentIndex < CONFIG.dimensions.size() - 1) {
@@ -370,6 +386,13 @@ public class ChunkPreloadMod implements ModInitializer {
 			server.getCommands().performPrefixedCommand(server.createCommandSourceStack(), CONFIG.onCompleteCommand);
 		}
 		broadcastProgress(server);
+	}
+
+	private void playCompletionSound(MinecraftServer server) {
+		for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+			player.level().playSound(null, player.getX(), player.getY(), player.getZ(), 
+					SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, SoundSource.MASTER, 1.0f, 1.0f);
+		}
 	}
 
 	private static void handleConsoleLogging() {
@@ -416,6 +439,8 @@ public class ChunkPreloadMod implements ModInitializer {
 		String dimId = level.dimension().identifier().toString();
 		state.markStarted(chunkX, chunkZ, dimId);
 		buildSpiral(CONFIG.radius);
+		
+		sessionStartTime = System.currentTimeMillis();
 		nextRequestIndex = 0;
 		inFlightIndices.clear();
 		completedIndices.clear();
@@ -423,6 +448,7 @@ public class ChunkPreloadMod implements ModInitializer {
 		chunksGeneratedThisSession = 0;
 		refillTaskPending.set(false);
 		cachedTargetStatus = null;
+		
 		LOGGER.info("Starting chunk preload: {} chunks in {} around ({}, {})", totalChunks, dimId, chunkX, chunkZ);
 		sendDiscordWebhook("Chunk preloading started in " + dimId + " at " + chunkX + ", " + chunkZ + " (" + totalChunks + " chunks)");
 
@@ -467,18 +493,15 @@ public class ChunkPreloadMod implements ModInitializer {
 	private static void requestMoreChunks(ServerLevel overworld, int limit) {
 		if (state == null || currentServer == null || currentServer.isStopped() || isLowMemory()) return;
 		int maxConcurrency = CONFIG.maxConcurrentAsyncChunks;
-		
 		if (cachedTargetStatus == null) {
 			String statusId;
 			if (CONFIG.lightingFixMode) statusId = "minecraft:light";
 			else if (CONFIG.structureOnlyMode) statusId = "minecraft:structure_starts";
 			else statusId = CONFIG.targetStatus;
-			
 			cachedTargetStatus = BuiltInRegistries.CHUNK_STATUS.get(Identifier.parse(statusId)).map(Holder.Reference::value).orElse(ChunkStatus.FULL);
 		}
 		ChunkStatus status = cachedTargetStatus;
 
-		// POINT OF INTEREST QUEUE
 		if (!CONFIG.pointsOfInterest.isEmpty() && nextRequestIndex == 0) {
 			processPOIs(overworld, status);
 		}
