@@ -1,5 +1,6 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" factoryName="Application" name="DevLaunchRunner" type="Application">
+    <module name="RenderFast" />
     <option name="MAIN_CLASS_NAME" value="com.example.renderfast.DevLaunchRunner"/>
     <shortenClasspath name="ARGS_FILE"/>
     <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$"/>
