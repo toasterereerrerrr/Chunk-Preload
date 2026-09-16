@@ -10,8 +10,8 @@ import java.util.List;
 
 public class RenderFastConfigScreen {
 	public static Screen create(Screen parent) {
-		RenderFastConfig config = RenderFastMod.CONFIG;
-		ConfigBuilder builder = ConfigBuilder.create().setParentScreen(parent).setTitle(Component.literal("RenderFast Configuration")).setSavingRunnable(() -> { config.save(); RenderFastMod.rebuildSpiral(); });
+		RenderFastConfig config = RenderFast.CONFIG;
+		ConfigBuilder builder = ConfigBuilder.create().setParentScreen(parent).setTitle(Component.literal("RenderFast Configuration")).setSavingRunnable(() -> { config.save(); RenderFast.rebuildSpiral(); });
 		ConfigEntryBuilder eb = builder.entryBuilder();
 
 		ConfigCategory general = builder.getOrCreateCategory(Component.literal("General"));

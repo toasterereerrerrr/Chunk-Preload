@@ -11,13 +11,13 @@
   "environment": "*",
   "entrypoints": {
     "main": [
-      "com.example.renderfast.RenderFastMod"
+      "com.example.renderfast.RenderFast"
     ],
     "client": [
       "com.example.renderfast.RenderFastClient"
     ],
     "modmenu": [
-      "com.example.renderfast.RenderFastModMenu"
+      "com.example.renderfast.RenderFastMenu"
     ]
   },
   "mixins": [

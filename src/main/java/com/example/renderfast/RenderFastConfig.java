@@ -67,24 +67,55 @@ public class RenderFastConfig {
 	public enum CpuUsageLevel { LOW, MEDIUM, HIGH, VERY_HIGH, INSANE }
 	public enum Shape { CIRCLE, SQUARE }
 
+	public void applyCpuProfile() {
+		if (cpuUsageLevel == null) cpuUsageLevel = CpuUsageLevel.MEDIUM;
+		maxConcurrentAsyncChunks = switch (cpuUsageLevel) {
+			case LOW -> 8;
+			case MEDIUM -> 32;
+			case HIGH -> 64;
+			case VERY_HIGH -> 128;
+			case INSANE -> 256;
+		};
+		if (radius < 1) radius = 100;
+		if (radius > 2000) radius = 2000;
+		if (maxConcurrentAsyncChunks < 1) maxConcurrentAsyncChunks = 1;
+		if (saveIntervalChunks < 0) saveIntervalChunks = 0;
+		if (watchdogTimeoutSeconds < 1) watchdogTimeoutSeconds = 1;
+		if (smoothEtaWindowSeconds < 1) smoothEtaWindowSeconds = 1;
+		if (playerSafetyRadius < 0) playerSafetyRadius = 0;
+		if (minFreeDiskSpaceMb < 0) minFreeDiskSpaceMb = 0;
+		if (memoryUsageThreshold < 0.0) memoryUsageThreshold = 0.0;
+		if (memoryUsageThreshold > 1.0) memoryUsageThreshold = 1.0;
+		if (busyTickThresholdMs < 0.0) busyTickThresholdMs = 0.0;
+		if (minTpsThreshold < 0.0) minTpsThreshold = 0.0;
+		if (dimensions == null || dimensions.isEmpty()) dimensions = new ArrayList<>(List.of("minecraft:overworld", "minecraft:the_nether", "minecraft:the_end"));
+		if (pointsOfInterest == null) pointsOfInterest = new ArrayList<>();
+		if (shape == null) shape = Shape.CIRCLE;
+	}
+
 	public static RenderFastConfig load() {
 		Path path = FabricLoader.getInstance().getConfigDir().resolve(FILE_NAME);
 		try {
 			if (Files.exists(path)) {
 				try (Reader reader = Files.newBufferedReader(path, StandardCharsets.UTF_8)) {
 					RenderFastConfig config = GSON.fromJson(reader, RenderFastConfig.class);
-					if (config != null) return config;
+					if (config != null) {
+						config.applyCpuProfile();
+						return config;
+					}
 				}
 			}
 		} catch (IOException e) {
-			RenderFastMod.LOGGER.warn("Failed to read {}, falling back to defaults", FILE_NAME, e);
+			RenderFast.LOGGER.warn("Failed to read {}, falling back to defaults", FILE_NAME, e);
 		}
 		RenderFastConfig defaults = new RenderFastConfig();
+		defaults.applyCpuProfile();
 		defaults.save();
 		return defaults;
 	}
 
 	public void save() {
+		applyCpuProfile();
 		Path path = FabricLoader.getInstance().getConfigDir().resolve(FILE_NAME);
 		try {
 			Files.createDirectories(path.getParent());
@@ -92,7 +123,7 @@ public class RenderFastConfig {
 				GSON.toJson(this, writer);
 			}
 		} catch (IOException e) {
-			RenderFastMod.LOGGER.warn("Failed to write {}", FILE_NAME, e);
+			RenderFast.LOGGER.warn("Failed to write {}", FILE_NAME, e);
 		}
 	}
 }

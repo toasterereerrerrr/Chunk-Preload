@@ -37,12 +37,12 @@ public class RenderFastClient implements ClientModInitializer {
 	private static int cachedLabelWidth = 0;
 	private static long lastHudUpdateTime = 0;
 
-	private static final KeyMapping.Category CATEGORY = KeyMapping.Category.register(Identifier.fromNamespaceAndPath(RenderFastMod.MOD_ID, "category"));
+	private static final KeyMapping.Category CATEGORY = KeyMapping.Category.register(Identifier.fromNamespaceAndPath(RenderFast.MOD_ID, "category"));
 	private static final KeyMapping OPEN_CONFIG_KEY = KeyMappingHelper.registerKeyMapping(new KeyMapping("key.renderfast.open_config", InputConstants.Type.KEYSYM, InputConstants.UNKNOWN.getValue(), CATEGORY));
 
 	@Override
 	public void onInitializeClient() {
-		ClientPlayNetworking.registerGlobalReceiver(PreloadProgressPayload.TYPE, (payload, context) -> {
+		ClientPlayNetworking.registerGlobalReceiver(RenderFastProgressPayload.TYPE, (payload, context) -> {
 			done = payload.done(); total = payload.total(); active = payload.active(); paused = payload.paused();
 			dimension = payload.dimension(); chunksPerSecond = payload.chunksPerSecond();
 			pauseReason = payload.pauseReason(); mapData = payload.mapData();
@@ -52,7 +52,7 @@ public class RenderFastClient implements ClientModInitializer {
 			updateCachedStrings();
 		});
 
-		HudElementRegistry.attachElementBefore(VanillaHudElements.CHAT, Identifier.fromNamespaceAndPath(RenderFastMod.MOD_ID, "renderfast_hud"), RenderFastClient::render);
+		HudElementRegistry.attachElementBefore(VanillaHudElements.CHAT, Identifier.fromNamespaceAndPath(RenderFast.MOD_ID, "renderfast_hud"), RenderFastClient::render);
 		ClientPlayConnectionEvents.JOIN.register((h, s, c) -> worldJoinTime = System.currentTimeMillis());
 		ClientPlayConnectionEvents.DISCONNECT.register((h, c) -> { worldJoinTime = -1; completedAtMillis = -1; done = 0; total = 0; active = false; cachedLabel = ""; });
 		ClientTickEvents.END_CLIENT_TICK.register(c -> { while (OPEN_CONFIG_KEY.consumeClick()) if (c.gui.screen() == null) c.setScreenAndShow(RenderFastConfigScreen.create(null)); });
@@ -70,22 +70,22 @@ public class RenderFastClient implements ClientModInitializer {
 			eta = String.format(" | ETA: %dm %ds", rem / 60, rem % 60);
 		}
 
-		if (RenderFastMod.CONFIG.showHudMetrics) cachedLabel = String.format("Preloading %s: %d/%d (%d%%)%s | %.1f ch/s%s", dimStr, done, total, percent, status, chunksPerSecond, eta);
+		if (RenderFast.CONFIG.showHudMetrics) cachedLabel = String.format("Preloading %s: %d/%d (%d%%)%s | %.1f ch/s%s", dimStr, done, total, percent, status, chunksPerSecond, eta);
 		else cachedLabel = String.format("Preloading %s: %d%% (%d/%d)%s", dimStr, percent, done, total, status);
 		cachedLabelWidth = f.width(cachedLabel);
 	}
 
 	private static void render(GuiGraphicsExtractor graphics, DeltaTracker deltaTracker) {
 		boolean completed = completedAtMillis > 0 && System.currentTimeMillis() - completedAtMillis <= HIDE_AFTER_MILLIS;
-		boolean showC2ME = C2ME_INSTALLED && RenderFastMod.CONFIG.showStatusMessages && worldJoinTime > 0 && (System.currentTimeMillis() - worldJoinTime) < 10000;
-		if (!showC2ME && ((!active && !completed) || total <= 0 || !RenderFastMod.CONFIG.showHud)) return;
+		boolean showC2ME = C2ME_INSTALLED && RenderFast.CONFIG.showStatusMessages && worldJoinTime > 0 && (System.currentTimeMillis() - worldJoinTime) < 10000;
+		if (!showC2ME && ((!active && !completed) || total <= 0 || !RenderFast.CONFIG.showHud)) return;
 
 		Minecraft mc = Minecraft.getInstance(); Font font = mc.font;
 		int width = mc.getWindow().getGuiScaledWidth();
 		int margin = 6; int y = margin;
 
 		if (showC2ME) { String l = "C2ME Detected - Extreme Generation Enabled"; graphics.text(font, l, width - font.width(l) - margin, y, ARGB.opaque(0x55FFFF), true); y += 12; }
-		if (active && RenderFastMod.CONFIG.turboMode) { String l = "Turbo Mode Active"; graphics.text(font, l, width - font.width(l) - margin, y, ARGB.opaque(0xFF5555), true); y += 12; }
+		if (active && RenderFast.CONFIG.turboMode) { String l = "Turbo Mode Active"; graphics.text(font, l, width - font.width(l) - margin, y, ARGB.opaque(0xFF5555), true); y += 12; }
 
 		if (completed) { graphics.text(font, "Generation Complete", width - font.width("Generation Complete") - margin, y, ARGB.opaque(0x55FF55), true); return; }
 		if (!active) return;
@@ -97,7 +97,7 @@ public class RenderFastClient implements ClientModInitializer {
 		graphics.fill(x, y, x + (int)(barW * Math.min(1f, (float)done/total)), y + 6, ARGB.opaque(0x55CC55));
 		graphics.outline(x, y, barW, 6, ARGB.opaque(0xFFFFFF));
 
-		if (RenderFastMod.CONFIG.showMiniMap) {
+		if (RenderFast.CONFIG.showMiniMap) {
 			y += 10;
 			for (int row = 0; row < 20; row++) {
 				StringBuilder grid = new StringBuilder();
