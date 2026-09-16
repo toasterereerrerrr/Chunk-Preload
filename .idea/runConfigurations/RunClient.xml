@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component name="ProjectRunConfigurationManager">
+  <configuration name="runClient" type="Gradle" factoryName="Gradle" singleton="true">
+    <option name="externalProjectPath" value="$PROJECT_DIR$" />
+    <option name="taskNames" value="runClient" />
+    <option name="scriptParameters" value="--no-daemon --warning-mode all" />
+    <option name="vmOptions" value="" />
+    <option name="showConsole" value="true" />
+    <method v="2" />
+  </configuration>
+</component>
