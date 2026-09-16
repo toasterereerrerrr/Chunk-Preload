@@ -1,0 +1,10 @@
+{
+  "key.renderfast.category": "RenderFast",
+  "key.renderfast.open_config": "Open RenderFast Configuration",
+  "renderfast.config.title": "RenderFast Configuration",
+  "renderfast.config.general": "General",
+  "renderfast.config.advanced": "Advanced",
+  "renderfast.config.performance": "Safety & Performance",
+  "renderfast.config.integration": "Integration",
+  "renderfast.config.help": "Features & Help"
+}

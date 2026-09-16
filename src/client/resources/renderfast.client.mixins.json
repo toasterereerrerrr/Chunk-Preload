@@ -1,0 +1,14 @@
+{
+	"required": true,
+	"package": "com.example.renderfast.client.mixin",
+	"compatibilityLevel": "JAVA_25",
+	"client": [
+		"PauseScreenMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	},
+	"overwrites": {
+		"requireAnnotations": true
+	}
+}

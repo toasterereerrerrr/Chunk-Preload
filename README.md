@@ -1,8 +1,8 @@
-# Chunk Preloader
+# RenderFast
 
 **A professional, high-performance chunk pre-generator for Minecraft (Fabric).**
 
-Chunk Preloader eliminates "chunk-loading stutter" by pre-generating terrain before you start exploring. Whether you're a single-player adventurer or a server owner looking to optimize performance for dozens of players, this mod is designed to saturate your hardware and get the job done as fast as possible.
+RenderFast eliminates "chunk-loading stutter" by pre-generating terrain before you start exploring. Whether you're a single-player adventurer or a server owner looking to optimize performance for dozens of players, this mod is designed to saturate your hardware and get the job done as fast as possible.
 
 > ## WARNING: PERFORMANCE IMPACT
 > Generating chunks is a heavy task for any CPU. **While preloading is active, you may experience lower TPS and occasional stutters.** 
@@ -30,6 +30,7 @@ Chunk Preloader eliminates "chunk-loading stutter" by pre-generating terrain bef
     *   **Auto-Turbo**: Automatically enables maximum speed when the server is empty and switches back to safety mode when players join.
 *   **Flexible Areas**: Support for **Circular (Spiral)** and **Square** generation areas.
 *   **Map Mod Sync**: Automatically triggers renders for **BlueMap**, **Dynmap**, and **Xaero's Map**.
+*   **Easy Access UI**: Custom button on the Pause (ESC) menu for instant configuration access.
 
 ---
 
@@ -39,25 +40,24 @@ All commands require OP level 2.
 
 | Command | Description |
 |---|---|
-| /chunkpreload start | Starts preloading around your current position. |
-| /chunkpreload start <radius> | Starts preloading with a custom radius. |
-| /chunkpreload start <radius> <x> <z> | Starts preloading around specific coordinates. |
-| /chunkpreload pause | Temporarily halts generation without losing progress. |
-| /chunkpreload resume | Continues a paused pregeneration. |
-| /chunkpreload reset | Clears progress for the current dimension to re-run. |
-| /chunkpreload border | Automatically preloads everything inside the world border. |
-| /chunkpreload estimate | Shows estimated disk space usage for the current run. |
-| /chunkpreload dryrun | Toggles Dry Run mode (shows area corners via particles). |
-| /chunkpreload benchmark | Runs a 100-chunk hardware test to find your optimal speed. |
-| /chunkpreload status | Shows progress, speed (ch/s), dimension, and ETA. |
-| /chunkpreload stop | Immediately halts and resets all tasks. |
-| /chunkpreload turbo | Toggles **Turbo Mode** (Bypasses all safety throttles). |
+| /renderfast start | Starts preloading around your current position. |
+| /renderfast start <radius> | Starts preloading with a custom radius. |
+| /renderfast start <radius> <x> <z> | Starts preloading around specific coordinates. |
+| /renderfast pause | Temporarily halts generation without losing progress. |
+| /renderfast resume | Continues a paused pregeneration. |
+| /renderfast reset | Clears progress for the current dimension to re-run. |
+| /renderfast border | Automatically preloads everything inside the world border. |
+| /renderfast estimate | Shows estimated disk space usage for the current run. |
+| /renderfast dryrun | Toggles Dry Run mode (shows area corners via particles). |
+| /renderfast status | Shows progress, speed (ch/s), dimension, and ETA. |
+| /renderfast stop | Immediately halts and resets all tasks. |
+| /renderfast turbo | Toggles **Turbo Mode** (Bypasses all safety throttles). |
 
 ---
 
 ## Configuration
 
-Reach the settings via **Mod Menu** or by binding a key to the **Chunk Preloader Config**.
+Reach the settings via **Mod Menu**, by binding a key in your Controls menu, or by clicking the **CP** button in the **Pause (ESC)** menu.
 
 *   **General**: Radius, Shape, CPU Presets (LOW to INSANE), and HUD Toggles.
 *   **Advanced**: Custom Dimension List, Points of Interest, Player Safety Radius, Target Status, and Memory Flush toggles.
@@ -77,7 +77,7 @@ Reach the settings via **Mod Menu** or by binding a key to the **Chunk Preloader
 
 ## Good to know
 
-*   **Background Generation**: Even when on the escape menu in a world, Chunk Preload will still continue to load the chunks in the background.
+*   **Background Generation**: Even when on the escape menu in a world, RenderFast will still continue to load the chunks in the background.
 *   **Singleplayer Pause**: In singleplayer, opening the Escape menu freezes the world, which also pauses generation. Stay in the "Options" menu if you want preloading to continue.
 *   **Target Status**: Defaults to minecraft:features. This generates terrain, trees, and ores at 2x speed compared to the full status used by traditional generators.
 

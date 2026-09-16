@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "id": "chunkpreload",
+  "id": "renderfast",
   "version": "${version}",
-  "name": "Chunk Preloader",
-  "description": "Pregenerates a radius of chunks around spawn the first time a player joins a new world, with a small progress HUD in the top-right corner.",
+  "name": "RenderFast",
+  "description": "High-performance chunk pre-generator that eliminates loading stutter by pre-generating terrain.",
   "authors": [
     "You"
   ],
@@ -11,15 +11,22 @@
   "environment": "*",
   "entrypoints": {
     "main": [
-      "com.example.chunkpreload.ChunkPreloadMod"
+      "com.example.renderfast.RenderFastMod"
     ],
     "client": [
-      "com.example.chunkpreload.ChunkPreloadClient"
+      "com.example.renderfast.RenderFastClient"
     ],
     "modmenu": [
-      "com.example.chunkpreload.ChunkPreloadModMenu"
+      "com.example.renderfast.RenderFastModMenu"
     ]
   },
+  "mixins": [
+    "renderfast.mixins.json",
+    {
+      "config": "renderfast.client.mixins.json",
+      "environment": "client"
+    }
+  ],
   "depends": {
     "fabricloader": ">=0.19.0",
     "minecraft": "~26.2",
