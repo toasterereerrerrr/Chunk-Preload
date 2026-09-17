@@ -42,7 +42,7 @@ public class RenderFastClient implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
-		ClientPlayNetworking.registerGlobalReceiver(RenderFastProgressPayload.TYPE, (payload, context) -> {
+		ClientPlayNetworking.registerGlobalReceiver(RenderFastProgressPayload.TYPE, (payload, _) -> {
 			done = payload.done(); total = payload.total(); active = payload.active(); paused = payload.paused();
 			dimension = payload.dimension(); chunksPerSecond = payload.chunksPerSecond();
 			pauseReason = payload.pauseReason(); mapData = payload.mapData();
@@ -53,13 +53,13 @@ public class RenderFastClient implements ClientModInitializer {
 		});
 
 		HudElementRegistry.attachElementBefore(VanillaHudElements.CHAT, Identifier.fromNamespaceAndPath(RenderFast.MOD_ID, "renderfast_hud"), RenderFastClient::render);
-		ClientPlayConnectionEvents.JOIN.register((h, s, c) -> worldJoinTime = System.currentTimeMillis());
-		ClientPlayConnectionEvents.DISCONNECT.register((h, c) -> { worldJoinTime = -1; completedAtMillis = -1; done = 0; total = 0; active = false; cachedLabel = ""; });
+		ClientPlayConnectionEvents.JOIN.register((_, _, _) -> worldJoinTime = System.currentTimeMillis());
+		ClientPlayConnectionEvents.DISCONNECT.register((_, _) -> { worldJoinTime = -1; completedAtMillis = -1; done = 0; total = 0; active = false; cachedLabel = ""; });
 		ClientTickEvents.END_CLIENT_TICK.register(c -> { while (OPEN_CONFIG_KEY.consumeClick()) if (c.gui.screen() == null) c.setScreenAndShow(RenderFastConfigScreen.create(null)); });
 	}
 
 	private static void updateCachedStrings() {
-		Minecraft c = Minecraft.getInstance(); Font f = c.font; if (f == null) return;
+		Minecraft c = Minecraft.getInstance(); Font f = c.font;
 		String dimStr = dimension.replace("minecraft:", "");
 		int percent = (total > 0) ? (int)(((float)done/total)*100) : 0;
 		String status = paused ? (pauseReason.isEmpty() ? " (PAUSED)" : " (" + pauseReason + ")") : "";

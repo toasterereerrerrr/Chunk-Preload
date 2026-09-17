@@ -44,13 +44,26 @@ public class RenderFastConfigScreen {
 		integration.addEntry(eb.startTextField(Component.literal("Discord Webhook URL"), config.discordWebhookUrl).setSaveConsumer(v -> config.discordWebhookUrl = v).build());
 		integration.addEntry(eb.startIntSlider(Component.literal("Player Safety Radius"), config.playerSafetyRadius, 0, 16).setDefaultValue(0).setTooltip(Component.literal("Automatically loads chunks around players to prevent exploration lag.")).setSaveConsumer(v -> config.playerSafetyRadius = v).build());
 
-		help.addEntry(eb.startTextDescription(Component.literal("§6--- Summary of Features ---")).build());
-		help.addEntry(eb.startTextDescription(Component.literal("§e⚡ Extreme Speed:§r Uses async pipelines to saturate your CPU.")).build());
-		help.addEntry(eb.startTextDescription(Component.literal("§e🛡️ Smart Throttling:§r Monitors TPS, RAM, and Disk space automatically.")).build());
-		help.addEntry(eb.startTextDescription(Component.literal("§e🌌 Multi-Dimension:§r Sequences through the Overworld, Nether, and End.")).build());
-		help.addEntry(eb.startTextDescription(Component.literal("§e⏸️ Pause & Resume:§r Commands to stop and start without losing progress.")).build());
-		help.addEntry(eb.startTextDescription(Component.literal("§e🗺️ Map Mod Sync:§r Automatically triggers BlueMap and Xaero renders.")).build());
-		help.addEntry(eb.startTextDescription(Component.literal("§e🕒 Smooth ETA:§r Sliding window calculation for accurate time estimates.")).build());
+		help.addEntry(eb.startTextDescription(Component.literal("§6§lRenderFast§r")).build());
+		help.addEntry(eb.startTextDescription(Component.literal("RenderFast eliminates \"chunk-loading stutter\" by pre-generating terrain before you start exploring. It features §bSmart Throttling§r to monitor TPS, RAM, and Disk space, and §bTurbo Mode§r to bypass all safety limits.")).build());
+		help.addEntry(eb.startTextDescription(Component.literal("§e§lKey Features:§r")).build());
+		help.addEntry(eb.startTextDescription(Component.literal("• §bExtreme Speed§r: Fully asynchronous loading pipeline with Immediate Refill logic.")).build());
+		help.addEntry(eb.startTextDescription(Component.literal("• §bDimension Sequence§r: Preload any dimension in a configurable order.")).build());
+		help.addEntry(eb.startTextDescription(Component.literal("• §bDetailed HUD§r: Displays exact pause reasons like LOW RAM or BUSY TICK.")).build());
+		help.addEntry(eb.startTextDescription(Component.literal("• §bPriority POIs§r: Generate specific coordinates first.")).build());
+		help.addEntry(eb.startTextDescription(Component.literal("• §bLighting Fix Mode§r: Specialized mode to fix dark/black chunks.")).build());
+		help.addEntry(eb.startTextDescription(Component.literal("• §bDry Run Preview§r: Visualize corners using particles.")).build());
+		help.addEntry(eb.startTextDescription(Component.literal("• §bDisk Estimation§r: Get an estimate of final file size.")).build());
+		help.addEntry(eb.startTextDescription(Component.literal("• §bCompletion Reports§r: Summary reports to console and Discord.")).build());
+		help.addEntry(eb.startTextDescription(Component.literal("• §bPlayer Safety Bubble§r: Automatically loads radius around players.")).build());
+		help.addEntry(eb.startTextDescription(Component.literal("• §bMap Mod Sync§r: Support for BlueMap, Dynmap, and Xaero's Map.")).build());
+		help.addEntry(eb.startTextDescription(Component.literal("§e§lCommands:§r")).build());
+		help.addEntry(eb.startTextDescription(Component.literal("§7/renderfast start [radius] [x] [z]§r")).build());
+		help.addEntry(eb.startTextDescription(Component.literal("§7/renderfast pause | resume | stop | reset | status§r")).build());
+		help.addEntry(eb.startTextDescription(Component.literal("§7/renderfast border | estimate | dryrun | turbo§r")).build());
+		help.addEntry(eb.startTextDescription(Component.literal("§e§lSetup:§r")).build());
+		help.addEntry(eb.startTextDescription(Component.literal("• MC 1.21.x (26.2) | Fabric Loader | Cloth Config.")).build());
+		help.addEntry(eb.startTextDescription(Component.literal("• Target Status: 'features' is 2x faster than 'full'.")).build());
 
 		return builder.build();
 	}

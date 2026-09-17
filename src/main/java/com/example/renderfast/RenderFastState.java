@@ -5,6 +5,7 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.datafix.DataFixTypes;
 import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.level.saveddata.SavedDataType;
 
@@ -24,7 +25,7 @@ public class RenderFastState extends SavedData {
 			Identifier.fromNamespaceAndPath(RenderFast.MOD_ID, "renderfast_state"),
 			RenderFastState::new,
 			CODEC,
-			null
+			DataFixTypes.LEVEL
 	);
 
 	boolean started = false;

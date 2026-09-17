@@ -60,7 +60,6 @@ public class RenderFast implements ModInitializer {
 	private static int chunksGeneratedThisSession = 0;
 	private static int chunksSinceLastSave = 0;
 	private static long sessionStartTime = 0;
-	private static long benchmarkStartTime = 0;
 	private static boolean isBenchmarking = false;
 
 	private static int nextRequestIndex = -1;
@@ -84,7 +83,7 @@ public class RenderFast implements ModInitializer {
 
 		PayloadTypeRegistry.clientboundPlay().register(RenderFastProgressPayload.TYPE, RenderFastProgressPayload.CODEC);
 
-		CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
+		CommandRegistrationCallback.EVENT.register((dispatcher, _, _) -> {
 			var root = literal("renderfast").requires(s -> s.permissions().hasPermission(Permissions.COMMANDS_ADMIN));
 
 			root.then(literal("start")
@@ -200,7 +199,7 @@ public class RenderFast implements ModInitializer {
 			dispatcher.register(root);
 		});
 
-		ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
+		ServerPlayConnectionEvents.JOIN.register((handler, _, server) -> {
 			ensureState(server);
 			if (CONFIG.enabled && state != null && !state.completed && !state.started) {
 				ServerLevel level = server.getLevel(Level.OVERWORLD);
@@ -217,12 +216,8 @@ public class RenderFast implements ModInitializer {
 		});
 
 		ServerTickEvents.END_SERVER_TICK.register(this::onServerTick);
-		ServerLifecycleEvents.SERVER_STOPPING.register(s -> stopAllPreloading());
-		ServerLifecycleEvents.SERVER_STOPPED.register(s -> stopAllPreloading());
-	}
-
-	public static Identifier id(String path) {
-		return Identifier.fromNamespaceAndPath(MOD_ID, path);
+		ServerLifecycleEvents.SERVER_STOPPING.register(_ -> stopAllPreloading());
+		ServerLifecycleEvents.SERVER_STOPPED.register(_ -> stopAllPreloading());
 	}
 
 	private static void stopAllPreloading() {
@@ -251,10 +246,8 @@ public class RenderFast implements ModInitializer {
 		ensureState(server);
 		if (state == null || !state.started || state.completed) {
 			if (isBenchmarking) {
-				long d = System.currentTimeMillis() - benchmarkStartTime;
-				LOGGER.info("Benchmark complete: 121 chunks in {}ms", d);
-				server.getPlayerList().broadcastSystemMessage(Component.literal("Benchmark complete: 121 chunks in " + d + "ms"), false);
-				isBenchmarking = false; sendDiscordWebhook("Benchmark complete: 121 chunks in " + d + "ms");
+				isBenchmarking = false;
+				sendDiscordWebhook("Benchmark complete");
 			}
 			return;
 		}
@@ -388,7 +381,7 @@ public class RenderFast implements ModInitializer {
 
 	private static void startPreload(ServerLevel level, int cx, int cz, int r) {
 		if (state == null) return;
-		int safeRadius = Math.max(1, Math.min(r <= 0 ? CONFIG.radius : r, 2048));
+		int safeRadius = Math.clamp(r <= 0 ? CONFIG.radius : r, 1, 2048);
 		String dimId = level.dimension().identifier().toString();
 		state.markStarted(cx, cz, dimId, safeRadius); buildSpiral(safeRadius);
 		sessionStartTime = System.currentTimeMillis(); nextRequestIndex = 0;
@@ -446,7 +439,7 @@ public class RenderFast implements ModInitializer {
 			req++; ChunkPos cp = new ChunkPos(state.centerX + offsetX[i], state.centerZ + offsetZ[i]);
 			inFlightIndices.add(i); inFlightStartTimes.put(i, System.currentTimeMillis());
 			level.getChunkSource().addTicketWithRadius(TicketType.FORCED, cp, 0);
-			level.getChunkSource().getChunkFuture(cp.x(), cp.z(), cachedTargetStatus, true).whenComplete((res, thr) -> {
+			level.getChunkSource().getChunkFuture(cp.x(), cp.z(), cachedTargetStatus, true).whenComplete((_, _) -> {
 				pendingCompletionQueue.add(i);
 				if (CONFIG.immediateRefill && currentServer != null && !currentServer.isStopped() && refillTaskPending.compareAndSet(false, true)) {
 					// Check if server is already under heavy load before scheduling refill

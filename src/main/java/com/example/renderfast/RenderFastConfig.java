@@ -57,7 +57,6 @@ public class RenderFastConfig {
 
 	// INTEGRATION
 	public String discordWebhookUrl = "";
-	public boolean notifyMapMods = true;
 	public int playerSafetyRadius = 0;
 
 	// CLIENT VISUALS
@@ -78,7 +77,6 @@ public class RenderFastConfig {
 		};
 		if (radius < 1) radius = 100;
 		if (radius > 2000) radius = 2000;
-		if (maxConcurrentAsyncChunks < 1) maxConcurrentAsyncChunks = 1;
 		if (saveIntervalChunks < 0) saveIntervalChunks = 0;
 		if (watchdogTimeoutSeconds < 1) watchdogTimeoutSeconds = 1;
 		if (smoothEtaWindowSeconds < 1) smoothEtaWindowSeconds = 1;
