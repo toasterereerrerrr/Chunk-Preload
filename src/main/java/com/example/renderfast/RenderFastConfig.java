@@ -30,24 +30,29 @@ public class RenderFastConfig {
 	public String targetStatus = "minecraft:features";
 	public List<String> dimensions = new ArrayList<>(List.of("minecraft:overworld", "minecraft:the_nether", "minecraft:the_end"));
 	public int maxConcurrentAsyncChunks = 32;
-	public boolean immediateRefill = true;
+	public boolean immediateRefill = false;
 	public boolean structureOnlyMode = false;
 	public boolean lightingFixMode = false;
 	public List<String> pointsOfInterest = new ArrayList<>();
 
 	// PERFORMANCE & SAFETY
 	public boolean adaptiveThrottling = true;
+	public boolean watchdogBreather = true;
+	public double breatherThresholdMs = 5000.0;
+	public double recoveryThresholdMs = 2000.0;
 	public double busyTickThresholdMs = 45.0;
 	public double minTpsThreshold = 15.0;
 	public double memoryUsageThreshold = 0.90;
 	public long minFreeDiskSpaceMb = 512;
 	public boolean aggressiveUnload = false;
 	public boolean onlyPreloadWhenEmpty = false;
+	public boolean pauseWhenEmpty = false;
 	public boolean autoTurboWhenEmpty = false;
 	public boolean turboMode = false;
 
 	// AUTOMATION & TOOLS
 	public int saveIntervalChunks = 500;
+	public int consoleReportIntervalSeconds = 30;
 	public String startTime = "00:00";
 	public String endTime = "23:59";
 	public int watchdogTimeoutSeconds = 60;
@@ -58,6 +63,8 @@ public class RenderFastConfig {
 	// INTEGRATION
 	public String discordWebhookUrl = "";
 	public int playerSafetyRadius = 0;
+	public boolean voxyIntegration = true;
+	public boolean distantHorizonsIntegration = true;
 
 	// CLIENT VISUALS
 	public boolean showMiniMap = false;
@@ -69,21 +76,24 @@ public class RenderFastConfig {
 	public void applyCpuProfile() {
 		if (cpuUsageLevel == null) cpuUsageLevel = CpuUsageLevel.MEDIUM;
 		maxConcurrentAsyncChunks = switch (cpuUsageLevel) {
-			case LOW -> 8;
-			case MEDIUM -> 32;
-			case HIGH -> 64;
-			case VERY_HIGH -> 128;
-			case INSANE -> 256;
+			case LOW -> 4;
+			case MEDIUM -> 16;
+			case HIGH -> 24;
+			case VERY_HIGH -> 32;
+			case INSANE -> 48;
 		};
 		if (radius < 1) radius = 100;
 		if (radius > 2000) radius = 2000;
 		if (saveIntervalChunks < 0) saveIntervalChunks = 0;
+		if (consoleReportIntervalSeconds < 1) consoleReportIntervalSeconds = 1;
 		if (watchdogTimeoutSeconds < 1) watchdogTimeoutSeconds = 1;
 		if (smoothEtaWindowSeconds < 1) smoothEtaWindowSeconds = 1;
 		if (playerSafetyRadius < 0) playerSafetyRadius = 0;
 		if (minFreeDiskSpaceMb < 0) minFreeDiskSpaceMb = 0;
 		if (memoryUsageThreshold < 0.0) memoryUsageThreshold = 0.0;
 		if (memoryUsageThreshold > 1.0) memoryUsageThreshold = 1.0;
+		if (breatherThresholdMs < 1.0) breatherThresholdMs = 1.0;
+		if (recoveryThresholdMs < 1.0) recoveryThresholdMs = 1.0;
 		if (busyTickThresholdMs < 0.0) busyTickThresholdMs = 0.0;
 		if (minTpsThreshold < 0.0) minTpsThreshold = 0.0;
 		if (dimensions == null || dimensions.isEmpty()) dimensions = new ArrayList<>(List.of("minecraft:overworld", "minecraft:the_nether", "minecraft:the_end"));

@@ -2,85 +2,85 @@
 
 **A professional, high-performance chunk pre-generator for Minecraft (Fabric).**
 
-RenderFast eliminates "chunk-loading stutter" by pre-generating terrain before you start exploring. Whether you're a single-player adventurer or a server owner looking to optimize performance for dozens of players, this mod is designed to saturate your hardware and get the job done as fast as possible.
+RenderFast eliminate "chunk-loading stutter" by pre-generating terrain before you start exploring. It features a fully asynchronous loading pipeline designed to saturate your hardware while maintaining strict server stability through aggressive watchdog protection and adaptive throttling.
 
-> ## WARNING: PERFORMANCE IMPACT
-> Generating chunks is a heavy task for any CPU. **While preloading is active, you may experience lower TPS and occasional stutters.** 
->
-> However, unlike basic pre-generators, this mod features **Smart Throttling**. It automatically monitors your server's TPS, RAM, and Disk space, pausing generation if the server becomes too busy. For those who want raw power, **Turbo Mode** is available to bypass all safety limits and generate at the absolute limit of your hardware.
+> [!IMPORTANT]
+> RenderFast now includes specialized support for **Voxy (Iris LOD)** and **Distant Horizons**, ensuring LOD data is correctly finalized and saved during pre-generation without overloading the async pipeline.
 
 ---
 
-## Key Features
+## 🚀 Key Features
 
-*   **Extreme Speed**: Uses a fully asynchronous loading pipeline with "Immediate Refill" logic. It bypasses vanilla tick latency to generate chunks as fast as your CPU and SSD can handle.
-*   **Custom Dimension Sequence**: Fully configurable dimension list. Preload any dimension (including modded ones) in the exact order you want.
-*   **Pause and Resume**: Stop generation at any time to free up CPU for events or combat, then resume exactly where you left off. Progress is saved per-world.
-*   **Detailed HUD Feedback**: The progress HUD now displays exact pause reasons (e.g., LOW RAM, BUSY TICK, PLAYERS ONLINE) so you know exactly why generation has throttled.
-*   **Priority Points of Interest**: Define specific coordinates in the config to be generated first, ensuring your most important areas are ready immediately.
-*   **Lighting Fix Mode**: A specialized mode that only runs the lighting engine. Perfect for fixing dark or black chunks in already generated areas.
-*   **Dry Run Preview**: Use particles to visualize the corners of your pregen area before committing CPU time.
-*   **Disk Usage Estimation**: Get an estimate of the final file size before starting large pregen runs.
-*   **Completion Reports**: Play a sound and post a detailed summary (Time, Speed, Chunks) to console and Discord when a run finishes.
-*   **Player Safety Bubble**: Automatically force-loads a small radius around online players in real-time, ensuring their local environment is always ready before they reach it.
-*   **Universal Support (Server-Side)**: Only needs to be installed on the server. Clients joining without the mod can still play perfectly, while those with it get a beautiful real-time progress HUD.
-*   **Smart and Dynamic Throttling**: 
-    *   **TPS Protection**: Pauses if server TPS drops too low.
-    *   **Memory Guard**: Aggressively flushes RAM and pauses if JVM usage is too high.
-    *   **Auto-Turbo**: Automatically enables maximum speed when the server is empty and switches back to safety mode when players join.
-*   **Flexible Areas**: Support for **Circular (Spiral)** and **Square** generation areas.
-*   **Map Mod Sync**: Automatically triggers renders for **BlueMap**, **Dynmap**, and **Xaero's Map**.
-*   **Easy Access UI**: Custom button on the Pause (ESC) menu for instant configuration access.
+*   **Extreme Speed**: Fully asynchronous generation using a throttled pipeline to prevent main-thread hangs.
+*   **Watchdog Breather**: Aggressively yields to the server if a tick takes too long (Default: 5s limit), preventing the 60s Watchdog crash.
+*   **Smart Throttling**: Real-time monitoring of TPS, RAM (Auto-GC), and Disk space.
+*   **Multi-Dimension Sequencing**: Automatically moves from Overworld to Nether to End in a configurable order.
+*   **LOD Mod Sync**: Native integration for **Voxy** and **Distant Horizons** to ensure smooth LOD generation.
+*   **HUD Feedback**: Detailed progress bar with pause reasons (LOW RAM, BUSY TICK, LAG RECOVERY) and ETA.
+*   **Priority POIs**: Generate specific coordinates or structures before the main spiral.
+*   **Lighting Fix Mode**: A specialized light-only engine to fix dark/black chunks across existing worlds.
 
 ---
 
-## Commands
+## ⌨️ Commands
 
-All commands require OP level 2.
+All commands support the `/rf` alias and require OP level 2.
 
+### 🎮 Control Commands
 | Command | Description |
 |---|---|
-| /renderfast start | Starts preloading around your current position. |
-| /renderfast start <radius> | Starts preloading with a custom radius. |
-| /renderfast start <radius> <x> <z> | Starts preloading around specific coordinates. |
-| /renderfast pause | Temporarily halts generation without losing progress. |
-| /renderfast resume | Continues a paused pregeneration. |
-| /renderfast reset | Clears progress for the current dimension to re-run. |
-| /renderfast border | Automatically preloads everything inside the world border. |
-| /renderfast estimate | Shows estimated disk space usage for the current run. |
-| /renderfast dryrun | Toggles Dry Run mode (shows area corners via particles). |
-| /renderfast status | Shows progress, speed (ch/s), dimension, and ETA. |
-| /renderfast stop | Immediately halts and resets all tasks. |
-| /renderfast turbo | Toggles **Turbo Mode** (Bypasses all safety throttles). |
+| `/rf start [r] [x] [z]` | Starts preloading. Radius and coordinates are optional. |
+| `/rf status` | Shows detailed progress, speed (ch/s), and ETA. |
+| `/rf pause` / `resume` | Temporarily halt or continue the current task. |
+| `/rf stop` | Cancels the active task immediately. |
+| `/rf reset` | Restarts the current task from 0% at your position. |
+| `/rf turbo` | Toggles **Turbo Mode** (Bypasses safety throttles). |
+| `/rf help` | Quick in-game reference for all commands. |
+
+### 🛠️ System & Tools
+| Command | Description |
+|---|---|
+| `/rf report <seconds>` | Frequency of progress updates in the server console. |
+| `/rf webhook <url\|clear>` | Configure Discord alerts for task completion. |
+| `/rf poi <add\|clear>` | Manage coordinates to generate before the main task. |
+| `/rf oncomplete <cmd>` | Command to execute when a dimension finishes. |
+| `/rf border` | Preloads everything inside the current world border. |
+| `/rf dryrun` | Visualize the target area corners using particles. |
+| `/rf estimate` | Estimates the final disk space usage for the run. |
+
+### ⚙️ Detailed Configuration (`/rf config ...`)
+| Sub-Command | Description |
+|---|---|
+| `enable` / `hud` / `dh` | Toggle global engine, HUD, or Distant Horizons sync. |
+| `voxy` / `refill` / `gc` | Toggle Voxy sync, Immediate Refill, or Aggressive GC. |
+| `radius <val>` | Set generation radius (1-2048). |
+| `cpu <PROFILE>` | Presets: `LOW`, `MEDIUM`, `HIGH`, `VERY_HIGH`, `INSANE`. |
+| `ram <%>` | RAM usage threshold (1-100) before auto-pausing. |
+| `disk <MB>` | Minimum free disk space required to run. |
+| `timeout <sec>` | Seconds before a "stuck" chunk is retried. |
+| `status <status>` | Target generation depth (Default: `minecraft:features`). |
 
 ---
 
-## Configuration
+## ⚙️ Configuration Screen
 
-Reach the settings via **Mod Menu**, by binding a key in your Controls menu, or by clicking the **CP** button in the **Pause (ESC)** menu.
-
-*   **General**: Radius, Shape, CPU Presets (LOW to INSANE), and HUD Toggles.
-*   **Advanced**: Custom Dimension List, Points of Interest, Player Safety Radius, Target Status, and Memory Flush toggles.
-*   **Integration**: Discord Webhook URL and Map Mod sync settings.
+Access the visual settings via **Mod Menu** or by clicking the **RF** button in the **Pause (ESC)** menu.
 
 ---
 
-## Requirements and Setup
+## 🛠️ Requirements
 
 *   **Minecraft**: 1.21.x (26.2)
 *   **Loader**: Fabric
 *   **Dependencies**: Fabric API, Cloth Config.
 
-**Installation:** Just drop the .jar into your mods folder. For servers, no client installation is required!
-
 ---
 
-## Good to know
+## 💡 Pro Tip: Speed vs. Quality
 
-*   **Background Generation**: Even when on the escape menu in a world, RenderFast will still continue to load the chunks in the background.
-*   **Singleplayer Pause**: In singleplayer, opening the Escape menu freezes the world, which also pauses generation. Stay in the "Options" menu if you want preloading to continue.
-*   **Target Status**: Defaults to minecraft:features. This generates terrain, trees, and ores at 2x speed compared to the full status used by traditional generators.
+*   **Status: features**: Generates terrain, trees, and ores. It is **2x faster** than the `full` status and is recommended for standard survival pre-generation.
+*   **Turbo Mode**: Use only on empty servers. It ignores TPS and "Busy Tick" safety checks to maximize SSD write speed.
 
-## License
+## 📄 License
 
-This project is licensed under ARR (All Rights Reserved). All rights are reserved by the author and no redistribution, modification, or commercial use is permitted without explicit written permission.
+This project is licensed under ARR (All Rights Reserved). No redistribution, modification, or commercial use is permitted without explicit written permission.

@@ -33,8 +33,7 @@
   "dryRunMode": false,
   "onCompleteCommand": "",
   "restartAfterChunks": 0,
-  "discordWebhookUrl": "",
-  "notifyMapMods": true,
+  "discordWebhookUrl": "https://discord.com/api/webhooks/1550368306631024651/sV1U6XsuLnaSixCeljx2q0yXpeZNo7V92g-S5wgEtQ6pxipPGTYCdi9g-huS4zdr94pp",
   "playerSafetyRadius": 16,
   "showMiniMap": true,
   "smoothEtaWindowSeconds": 30

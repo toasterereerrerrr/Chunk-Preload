@@ -1,6 +1,8 @@
 package com.example.renderfast;
 
+import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
+import com.mojang.brigadier.arguments.StringArgumentType;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
@@ -8,6 +10,7 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
+import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.core.particles.ParticleTypes;
@@ -39,7 +42,6 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import static net.minecraft.commands.Commands.argument;
 import static net.minecraft.commands.Commands.literal;
@@ -57,22 +59,21 @@ public class RenderFast implements ModInitializer {
 	private static ChunkStatus cachedTargetStatus;
 	private static String currentPauseReason = "";
 
-	private static int chunksGeneratedThisSession = 0;
 	private static int chunksSinceLastSave = 0;
 	private static long sessionStartTime = 0;
-	private static boolean isBenchmarking = false;
 
 	private static int nextRequestIndex = -1;
 	private static final Set<Integer> inFlightIndices = Collections.synchronizedSet(new HashSet<>());
 	private static final Map<Integer, Long> inFlightStartTimes = new ConcurrentHashMap<>();
 	private static final Set<Integer> completedIndices = Collections.synchronizedSet(new HashSet<>());
 	private static final ConcurrentLinkedQueue<Integer> pendingCompletionQueue = new ConcurrentLinkedQueue<>();
-	private static final AtomicBoolean refillTaskPending = new AtomicBoolean(false);
 
 	private static final Deque<Long> timeWindow = new ArrayDeque<>();
 	private static final Deque<Integer> countWindow = new ArrayDeque<>();
 	private static float currentCps = 0;
 
+	private static long currentTickStartTime = 0;
+	private static boolean inLagRecovery = false;
 	private static MinecraftServer currentServer;
 	private static final HttpClient HTTP_CLIENT = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NORMAL).build();
 
@@ -82,133 +83,15 @@ public class RenderFast implements ModInitializer {
 		buildSpiral(CONFIG.radius);
 
 		PayloadTypeRegistry.clientboundPlay().register(RenderFastProgressPayload.TYPE, RenderFastProgressPayload.CODEC);
-
-		CommandRegistrationCallback.EVENT.register((dispatcher, _, _) -> {
-			var root = literal("renderfast").requires(s -> s.permissions().hasPermission(Permissions.COMMANDS_ADMIN));
-
-			root.then(literal("start")
-				.executes(c -> {
-					ensureState(c.getSource().getServer());
-					BlockPos p = BlockPos.containing(c.getSource().getPosition());
-					startPreload(c.getSource().getLevel(), p.getX() >> 4, p.getZ() >> 4);
-					c.getSource().sendSuccess(() -> Component.literal("Started preloading around your position"), true);
-					return 1;
-				})
-				.then(argument("radius", IntegerArgumentType.integer(1)).executes(c -> {
-					int r = IntegerArgumentType.getInteger(c, "radius");
-					ensureState(c.getSource().getServer());
-					BlockPos p = BlockPos.containing(c.getSource().getPosition());
-					startPreload(c.getSource().getLevel(), p.getX() >> 4, p.getZ() >> 4, r);
-					c.getSource().sendSuccess(() -> Component.literal("Started preloading with radius " + r), true);
-					return 1;
-				}).then(argument("x", IntegerArgumentType.integer()).then(argument("z", IntegerArgumentType.integer()).executes(c -> {
-					int r = IntegerArgumentType.getInteger(c, "radius");
-					int x = IntegerArgumentType.getInteger(c, "x");
-					int z = IntegerArgumentType.getInteger(c, "z");
-					ensureState(c.getSource().getServer());
-					startPreload(c.getSource().getLevel(), x >> 4, z >> 4, r);
-					c.getSource().sendSuccess(() -> Component.literal("Started preloading at (" + x + ", " + z + ") with radius " + r), true);
-					return 1;
-				})))));
-
-			root.then(literal("pause").executes(c -> {
-				ensureState(c.getSource().getServer()); state.setPaused(true); currentPauseReason = "MANUAL";
-				c.getSource().sendSuccess(() -> Component.literal("Preloading paused"), true); return 1;
-			}));
-
-			root.then(literal("resume").executes(c -> {
-				ensureState(c.getSource().getServer()); state.setPaused(false); currentPauseReason = "";
-				c.getSource().sendSuccess(() -> Component.literal("Preloading resumed"), true); return 1;
-			}));
-
-			root.then(literal("reset").executes(c -> {
-				ensureState(c.getSource().getServer());
-				if (state != null) {
-					state.started = false;
-					state.completed = false;
-					state.paused = false;
-					state.doneCount = 0;
-					state.radius = Math.max(1, CONFIG.radius);
-					state.setDirty();
-					currentPauseReason = "";
-					inFlightIndices.clear();
-					inFlightStartTimes.clear();
-					completedIndices.clear();
-					pendingCompletionQueue.clear();
-				}
-				BlockPos p = BlockPos.containing(c.getSource().getPosition());
-				startPreload(c.getSource().getLevel(), p.getX() >> 4, p.getZ() >> 4);
-				c.getSource().sendSuccess(() -> Component.literal("Pregen progress reset."), true); return 1;
-			}));
-
-			root.then(literal("border").executes(c -> {
-				ensureState(c.getSource().getServer());
-				ServerLevel level = c.getSource().getLevel();
-				var border = level.getWorldBorder();
-				int minX = (int) Math.floor(border.getMinX());
-				int maxX = (int) Math.floor(border.getMaxX());
-				int minZ = (int) Math.floor(border.getMinZ());
-				int maxZ = (int) Math.floor(border.getMaxZ());
-				int centerX = (minX + maxX) / 2;
-				int centerZ = (minZ + maxZ) / 2;
-				int radius = Math.max(1, (int) Math.min(Math.max((maxX - minX), (maxZ - minZ)) / 2.0, CONFIG.radius));
-				startPreload(level, centerX >> 4, centerZ >> 4, radius);
-				c.getSource().sendSuccess(() -> Component.literal("Started border preloading with radius " + radius), true);
-				return 1;
-			}));
-
-			root.then(literal("status").executes(c -> {
-				ensureState(c.getSource().getServer());
-				if (!state.started) { c.getSource().sendSuccess(() -> Component.literal("Not started"), false); }
-				else if (state.completed) { c.getSource().sendSuccess(() -> Component.literal("Completed: " + state.doneCount + "/" + totalChunks), false); }
-				else {
-					int p = (int)(((float)state.doneCount / totalChunks) * 100);
-					String bar = "=".repeat(p/5) + "-".repeat(20 - (p/5));
-					String msg = String.format("§6RenderFast Status:§r\n" +
-							"§7Progress:§r [%s] %d%% (%d/%d)\n" +
-							"§7Dimension:§r %s\n" +
-							"§7Speed:§r %.1f ch/s | §7ETA:§r %s\n" +
-							"§7Throttled:§r %s", 
-							bar, p, state.doneCount, totalChunks, state.dimension, currentCps, formatEta(), 
-							currentPauseReason.isEmpty() ? "§aNone§r" : "§c" + currentPauseReason + "§r");
-					c.getSource().sendSuccess(() -> Component.literal(msg), false);
-				}
-				return 1;
-			}));
-
-			root.then(literal("estimate").executes(c -> {
-				double mb = (totalChunks * 10240.0) / (1024.0 * 1024.0);
-				c.getSource().sendSuccess(() -> Component.literal(String.format("Estimate: ~%.2f MB disk space.", mb)), false); return 1;
-			}));
-
-			root.then(literal("dryrun").executes(c -> {
-				CONFIG.dryRunMode = !CONFIG.dryRunMode; CONFIG.save();
-				c.getSource().sendSuccess(() -> Component.literal("Dry Run Mode: " + (CONFIG.dryRunMode ? "ON" : "OFF")), true); return 1;
-			}));
-
-			root.then(literal("stop").executes(c -> {
-				ensureState(c.getSource().getServer()); state.markCompleted();
-				c.getSource().sendSuccess(() -> Component.literal("Preloading stopped"), true); return 1;
-			}));
-
-			root.then(literal("turbo").executes(c -> {
-				CONFIG.turboMode = !CONFIG.turboMode; CONFIG.save();
-				c.getSource().sendSuccess(() -> Component.literal("Turbo Mode: " + (CONFIG.turboMode ? "ON" : "OFF")), true); return 1;
-			}));
-
-			dispatcher.register(root);
-		});
+		CommandRegistrationCallback.EVENT.register((dispatcher, _, _) -> registerCommands(dispatcher));
 
 		ServerPlayConnectionEvents.JOIN.register((handler, _, server) -> {
 			ensureState(server);
-			if (CONFIG.enabled && state != null && !state.completed && !state.started) {
-				ServerLevel level = server.getLevel(Level.OVERWORLD);
-				if (level != null) startPreload(level, handler.getPlayer().blockPosition().getX() >> 4, handler.getPlayer().blockPosition().getZ() >> 4);
-			}
 			sendProgress(handler.getPlayer());
 		});
 
 		ServerTickEvents.START_SERVER_TICK.register(server -> {
+			currentTickStartTime = System.currentTimeMillis();
 			if (state != null && state.started && !state.completed) {
 				ServerLevel level = getLevelForDimension(server, state.dimension);
 				if (level != null) processCompletions(level);
@@ -220,37 +103,150 @@ public class RenderFast implements ModInitializer {
 		ServerLifecycleEvents.SERVER_STOPPED.register(_ -> stopAllPreloading());
 	}
 
+	private static void registerCommands(CommandDispatcher<CommandSourceStack> dispatcher) {
+		var root = literal("renderfast").requires(s -> s.permissions().hasPermission(Permissions.COMMANDS_ADMIN));
+
+		root.then(literal("start")
+			.executes(c -> {
+				ensureState(c.getSource().getServer());
+				BlockPos p = BlockPos.containing(c.getSource().getPosition());
+				if (canContinue(c.getSource().getLevel(), p.getX() >> 4, p.getZ() >> 4, CONFIG.radius)) {
+					if (state.paused) { state.setPaused(false); currentPauseReason = ""; c.getSource().sendSuccess(() -> Component.literal("Resuming task..."), true); }
+					else c.getSource().sendSuccess(() -> Component.literal("Already running here."), false);
+					return 1;
+				}
+				startPreload(c.getSource().getLevel(), p.getX() >> 4, p.getZ() >> 4);
+				c.getSource().sendSuccess(() -> Component.literal("Started preload."), true);
+				return 1;
+			})
+			.then(argument("radius", IntegerArgumentType.integer(1)).executes(c -> {
+				int r = IntegerArgumentType.getInteger(c, "radius");
+				ensureState(c.getSource().getServer());
+				BlockPos p = BlockPos.containing(c.getSource().getPosition());
+				startPreload(c.getSource().getLevel(), p.getX() >> 4, p.getZ() >> 4, r);
+				c.getSource().sendSuccess(() -> Component.literal("Started radius " + r), true);
+				return 1;
+			})));
+
+		root.then(literal("pause").executes(c -> {
+			ensureState(c.getSource().getServer());
+			if (!state.started || state.completed) { c.getSource().sendFailure(Component.literal("No task active.")); return 0; }
+			state.setPaused(true); currentPauseReason = "MANUAL";
+			c.getSource().sendSuccess(() -> Component.literal("Paused"), true); return 1;
+		}));
+
+		root.then(literal("resume").executes(c -> {
+			ensureState(c.getSource().getServer());
+			if (!state.started || state.completed) { c.getSource().sendFailure(Component.literal("No task active.")); return 0; }
+			state.setPaused(false); currentPauseReason = "";
+			c.getSource().sendSuccess(() -> Component.literal("Resumed"), true); return 1;
+		}));
+
+		root.then(literal("reset").executes(c -> {
+			ensureState(c.getSource().getServer());
+			if (!state.started) { c.getSource().sendFailure(Component.literal("No task to reset.")); return 0; }
+			BlockPos p = BlockPos.containing(c.getSource().getPosition());
+			startPreload(c.getSource().getLevel(), p.getX() >> 4, p.getZ() >> 4, state.radius);
+			c.getSource().sendSuccess(() -> Component.literal("Reset and restarted."), true); return 1;
+		}));
+
+		root.then(literal("stop").executes(c -> {
+			ensureState(c.getSource().getServer());
+			if (!state.started || state.completed) { c.getSource().sendFailure(Component.literal("No active task.")); return 0; }
+			state.markCompleted(); c.getSource().sendSuccess(() -> Component.literal("Stopped."), true); return 1;
+		}));
+
+		root.then(literal("status").executes(c -> {
+			ensureState(c.getSource().getServer());
+			if (!state.started) { c.getSource().sendSuccess(() -> Component.literal("Not started"), false); }
+			else if (state.completed) { c.getSource().sendSuccess(() -> Component.literal("Completed: " + state.doneCount + "/" + totalChunks), false); }
+			else {
+				int p = (int)(((float)state.doneCount / totalChunks) * 100);
+				String msg = String.format("§6Status:§r %d%% (%d/%d) | Speed: %.1f ch/s | Throttled: %s", 
+						p, state.doneCount, totalChunks, currentCps, currentPauseReason.isEmpty() ? "None" : currentPauseReason);
+				c.getSource().sendSuccess(() -> Component.literal(msg), false);
+			}
+			return 1;
+		}));
+
+		root.then(literal("turbo").executes(c -> {
+			CONFIG.turboMode = !CONFIG.turboMode; CONFIG.save();
+			c.getSource().sendSuccess(() -> Component.literal("Turbo Mode: " + (CONFIG.turboMode ? "ON" : "OFF")), true); return 1;
+		}));
+
+		var config = literal("config");
+		config.then(literal("radius").then(argument("v", IntegerArgumentType.integer(1, 2048)).executes(c -> { CONFIG.radius = IntegerArgumentType.getInteger(c, "v"); CONFIG.save(); c.getSource().sendSuccess(() -> Component.literal("Radius: " + CONFIG.radius), true); return 1; })));
+		config.then(literal("enable").executes(c -> { CONFIG.enabled = !CONFIG.enabled; CONFIG.save(); c.getSource().sendSuccess(() -> Component.literal("Enabled: " + (CONFIG.enabled ? "ON" : "OFF")), true); return 1; }));
+		config.then(literal("hud").executes(c -> { CONFIG.showHud = !CONFIG.showHud; CONFIG.save(); c.getSource().sendSuccess(() -> Component.literal("HUD: " + (CONFIG.showHud ? "ON" : "OFF")), true); return 1; }));
+		config.then(literal("minimap").executes(c -> { CONFIG.showMiniMap = !CONFIG.showMiniMap; CONFIG.save(); c.getSource().sendSuccess(() -> Component.literal("MiniMap: " + (CONFIG.showMiniMap ? "ON" : "OFF")), true); return 1; }));
+		config.then(literal("metrics").executes(c -> { CONFIG.showHudMetrics = !CONFIG.showHudMetrics; CONFIG.save(); c.getSource().sendSuccess(() -> Component.literal("Metrics: " + (CONFIG.showHudMetrics ? "ON" : "OFF")), true); return 1; }));
+		config.then(literal("statusmsg").executes(c -> { CONFIG.showStatusMessages = !CONFIG.showStatusMessages; CONFIG.save(); c.getSource().sendSuccess(() -> Component.literal("Status Messages: " + (CONFIG.showStatusMessages ? "ON" : "OFF")), true); return 1; }));
+		
+		config.then(literal("adaptive").executes(c -> { CONFIG.adaptiveThrottling = !CONFIG.adaptiveThrottling; CONFIG.save(); c.getSource().sendSuccess(() -> Component.literal("Adaptive Throttling: " + (CONFIG.adaptiveThrottling ? "ON" : "OFF")), true); return 1; }));
+		config.then(literal("watchdog").executes(c -> { CONFIG.watchdogBreather = !CONFIG.watchdogBreather; CONFIG.save(); c.getSource().sendSuccess(() -> Component.literal("Watchdog Breather: " + (CONFIG.watchdogBreather ? "ON" : "OFF")), true); return 1; }));
+		config.then(literal("breather").then(argument("ms", IntegerArgumentType.integer(1)).executes(c -> { CONFIG.breatherThresholdMs = (double) IntegerArgumentType.getInteger(c, "ms"); CONFIG.save(); c.getSource().sendSuccess(() -> Component.literal("Breather Threshold: " + CONFIG.breatherThresholdMs + "ms"), true); return 1; })));
+		config.then(literal("recovery").then(argument("ms", IntegerArgumentType.integer(1)).executes(c -> { CONFIG.recoveryThresholdMs = (double) IntegerArgumentType.getInteger(c, "ms"); CONFIG.save(); c.getSource().sendSuccess(() -> Component.literal("Recovery Threshold: " + CONFIG.recoveryThresholdMs + "ms"), true); return 1; })));
+		
+		config.then(literal("pauseoffline").executes(c -> { CONFIG.pauseWhenEmpty = !CONFIG.pauseWhenEmpty; CONFIG.save(); c.getSource().sendSuccess(() -> Component.literal("Pause Offline: " + (CONFIG.pauseWhenEmpty ? "ON" : "OFF")), true); return 1; }));
+		config.then(literal("pauseonline").executes(c -> { CONFIG.onlyPreloadWhenEmpty = !CONFIG.onlyPreloadWhenEmpty; CONFIG.save(); c.getSource().sendSuccess(() -> Component.literal("Pause Online: " + (CONFIG.onlyPreloadWhenEmpty ? "ON" : "OFF")), true); return 1; }));
+		config.then(literal("autoturbo").executes(c -> { CONFIG.autoTurboWhenEmpty = !CONFIG.autoTurboWhenEmpty; CONFIG.save(); c.getSource().sendSuccess(() -> Component.literal("Auto-Turbo: " + (CONFIG.autoTurboWhenEmpty ? "ON" : "OFF")), true); return 1; }));
+		
+		config.then(literal("voxy").executes(c -> { CONFIG.voxyIntegration = !CONFIG.voxyIntegration; CONFIG.save(); c.getSource().sendSuccess(() -> Component.literal("Voxy Integration: " + (CONFIG.voxyIntegration ? "ON" : "OFF")), true); return 1; }));
+		config.then(literal("dh").executes(c -> { CONFIG.distantHorizonsIntegration = !CONFIG.distantHorizonsIntegration; CONFIG.save(); c.getSource().sendSuccess(() -> Component.literal("Distant Horizons Integration: " + (CONFIG.distantHorizonsIntegration ? "ON" : "OFF")), true); return 1; }));
+
+		config.then(literal("ram").then(argument("pct", IntegerArgumentType.integer(1, 100)).executes(c -> { CONFIG.memoryUsageThreshold = IntegerArgumentType.getInteger(c, "pct") / 100.0; CONFIG.save(); c.getSource().sendSuccess(() -> Component.literal("RAM limit: " + (CONFIG.memoryUsageThreshold * 100) + "%"), true); return 1; })));
+		config.then(literal("disk").then(argument("mb", IntegerArgumentType.integer(1)).executes(c -> { CONFIG.minFreeDiskSpaceMb = IntegerArgumentType.getInteger(c, "mb"); CONFIG.save(); c.getSource().sendSuccess(() -> Component.literal("Min Disk: " + CONFIG.minFreeDiskSpaceMb + "MB"), true); return 1; })));
+		config.then(literal("timeout").then(argument("sec", IntegerArgumentType.integer(1)).executes(c -> { CONFIG.watchdogTimeoutSeconds = IntegerArgumentType.getInteger(c, "sec"); CONFIG.save(); c.getSource().sendSuccess(() -> Component.literal("Timeout: " + CONFIG.watchdogTimeoutSeconds + "s"), true); return 1; })));
+		config.then(literal("status").then(argument("val", StringArgumentType.string()).executes(c -> { CONFIG.targetStatus = StringArgumentType.getString(c, "val"); CONFIG.save(); c.getSource().sendSuccess(() -> Component.literal("Target Status: " + CONFIG.targetStatus), true); return 1; })));
+		config.then(literal("dimensions").then(argument("list", StringArgumentType.greedyString()).executes(c -> { CONFIG.dimensions = new ArrayList<>(Arrays.asList(StringArgumentType.getString(c, "list").split(","))); CONFIG.dimensions.replaceAll(String::trim); CONFIG.save(); c.getSource().sendSuccess(() -> Component.literal("Dimensions updated."), true); return 1; })));
+		config.then(literal("saveinterval").then(argument("v", IntegerArgumentType.integer(0)).executes(c -> { CONFIG.saveIntervalChunks = IntegerArgumentType.getInteger(c, "v"); CONFIG.save(); c.getSource().sendSuccess(() -> Component.literal("Save interval: " + CONFIG.saveIntervalChunks), true); return 1; })));
+		config.then(literal("oncomplete").then(argument("cmd", StringArgumentType.greedyString()).executes(c -> { CONFIG.onCompleteCommand = StringArgumentType.getString(c, "cmd"); CONFIG.save(); c.getSource().sendSuccess(() -> Component.literal("On Complete set."), true); return 1; })));
+		config.then(literal("restart").then(argument("v", IntegerArgumentType.integer(0)).executes(c -> { CONFIG.restartAfterChunks = IntegerArgumentType.getInteger(c, "v"); CONFIG.save(); c.getSource().sendSuccess(() -> Component.literal("Restart after " + CONFIG.restartAfterChunks + " chunks"), true); return 1; })));
+		config.then(literal("refill").executes(c -> { CONFIG.immediateRefill = !CONFIG.immediateRefill; CONFIG.save(); c.getSource().sendSuccess(() -> Component.literal("Refill: " + (CONFIG.immediateRefill ? "ON" : "OFF")), true); return 1; }));
+		config.then(literal("lighting").executes(c -> { CONFIG.lightingFixMode = !CONFIG.lightingFixMode; CONFIG.save(); c.getSource().sendSuccess(() -> Component.literal("Lighting Fix: " + (CONFIG.lightingFixMode ? "ON" : "OFF")), true); return 1; }));
+		config.then(literal("structure").executes(c -> { CONFIG.structureOnlyMode = !CONFIG.structureOnlyMode; CONFIG.save(); c.getSource().sendSuccess(() -> Component.literal("Structure Only: " + (CONFIG.structureOnlyMode ? "ON" : "OFF")), true); return 1; }));
+		config.then(literal("gc").executes(c -> { CONFIG.aggressiveUnload = !CONFIG.aggressiveUnload; CONFIG.save(); c.getSource().sendSuccess(() -> Component.literal("Aggressive GC: " + (CONFIG.aggressiveUnload ? "ON" : "OFF")), true); return 1; }));
+		config.then(literal("busytick").then(argument("ms", IntegerArgumentType.integer(1)).executes(c -> { CONFIG.busyTickThresholdMs = (double) IntegerArgumentType.getInteger(c, "ms"); CONFIG.save(); c.getSource().sendSuccess(() -> Component.literal("Busy Tick Threshold: " + CONFIG.busyTickThresholdMs + "ms"), true); return 1; })));
+		config.then(literal("mintps").then(argument("v", IntegerArgumentType.integer(1)).executes(c -> { CONFIG.minTpsThreshold = (double) IntegerArgumentType.getInteger(c, "v"); CONFIG.save(); c.getSource().sendSuccess(() -> Component.literal("Min TPS: " + CONFIG.minTpsThreshold), true); return 1; })));
+		config.then(literal("window").then(argument("sec", IntegerArgumentType.integer(1)).executes(c -> { CONFIG.smoothEtaWindowSeconds = IntegerArgumentType.getInteger(c, "sec"); CONFIG.save(); c.getSource().sendSuccess(() -> Component.literal("ETA Window: " + CONFIG.smoothEtaWindowSeconds + "s"), true); return 1; })));
+
+		var poi = literal("poi");
+		poi.then(literal("add").then(argument("coords", StringArgumentType.greedyString()).executes(c -> { String s = StringArgumentType.getString(c, "coords"); CONFIG.pointsOfInterest.add(s); CONFIG.save(); c.getSource().sendSuccess(() -> Component.literal("Added POI: " + s), true); return 1; })));
+		poi.then(literal("clear").executes(c -> { CONFIG.pointsOfInterest.clear(); CONFIG.save(); c.getSource().sendSuccess(() -> Component.literal("POIs cleared."), true); return 1; }));
+		config.then(poi);
+		
+		root.then(config);
+		dispatcher.register(root);
+		dispatcher.register(literal("rf").requires(s -> s.permissions().hasPermission(Permissions.COMMANDS_ADMIN)).redirect(root.build()));
+	}
+
+	private static boolean canContinue(ServerLevel level, int cx, int cz, int r) {
+		if (state == null || !state.started || state.completed) return false;
+		return state.centerX == cx && state.centerZ == cz && state.radius == r && state.dimension.equals(level.dimension().identifier().toString());
+	}
+
 	private static void stopAllPreloading() {
 		state = null; currentServer = null; nextRequestIndex = -1;
 		inFlightIndices.clear(); inFlightStartTimes.clear(); completedIndices.clear(); pendingCompletionQueue.clear();
-		tickCounter = 0; lastBroadcastDone = -1; lastBroadcastActive = false; refillTaskPending.set(false);
 	}
 
 	private static void ensureState(MinecraftServer server) {
 		currentServer = server;
 		if (state == null) {
 			state = RenderFastState.get(server);
-			if (state.started) {
-				buildSpiral(state.radius);
-				nextRequestIndex = state.doneCount;
-			}
+			if (state.started) { buildSpiral(state.radius); nextRequestIndex = state.doneCount; }
 		}
 	}
 
 	private static int tickCounter = 0;
+	private static long lastConsoleReportTime = 0;
 	private static final int BROADCAST_INTERVAL_TICKS = 5;
 	private static int lastBroadcastDone = -1;
 	private static boolean lastBroadcastActive = false;
 
 	private void onServerTick(MinecraftServer server) {
 		ensureState(server);
-		if (state == null || !state.started || state.completed) {
-			if (isBenchmarking) {
-				isBenchmarking = false;
-				sendDiscordWebhook("Benchmark complete");
-			}
-			return;
-		}
+		if (state == null || !state.started || state.completed) return;
 
 		ServerLevel currentLevel = getLevelForDimension(server, state.dimension);
 		if (currentLevel == null) return;
@@ -260,31 +256,32 @@ public class RenderFast implements ModInitializer {
 
 		if (CONFIG.enabled && !state.paused) {
 			updateCps();
-			if (!isInsideWorkHours()) {
-				currentPauseReason = "OFF HOURS";
-				broadcastProgress(server);
-				return;
-			}
-			if (CONFIG.playerSafetyRadius > 0) requestSafetyChunks(server);
+			if (!isInsideWorkHours()) { currentPauseReason = "OFF HOURS"; broadcastProgress(server); return; }
 
-			boolean empty = server.getPlayerCount() == 0;
-			boolean isTurbo = CONFIG.turboMode || (CONFIG.autoTurboWhenEmpty && empty);
-			boolean tooManyPlayers = CONFIG.onlyPreloadWhenEmpty && !empty;
+			long elapsedThisTick = System.currentTimeMillis() - currentTickStartTime;
+			if (inLagRecovery) {
+				double avgMs = server.getAverageTickTimeNanos() / 1_000_000.0;
+				if (avgMs < CONFIG.recoveryThresholdMs && elapsedThisTick < CONFIG.recoveryThresholdMs) inLagRecovery = false;
+				else { currentPauseReason = "LAG RECOVERY"; broadcastProgress(server); return; }
+			}
+
+			boolean isTurbo = CONFIG.turboMode || (CONFIG.autoTurboWhenEmpty && server.getPlayerCount() == 0);
+			boolean tooManyPlayers = CONFIG.onlyPreloadWhenEmpty && server.getPlayerCount() > 0;
+			boolean stopOffline = CONFIG.pauseWhenEmpty && server.getPlayerCount() == 0;
 			boolean lowDisk = (server.getWorldPath(LevelResource.ROOT).toFile().getFreeSpace() / (1024 * 1024)) < CONFIG.minFreeDiskSpaceMb;
 			boolean lowMemory = isLowMemory();
 			long avgTickNanos = server.getAverageTickTimeNanos();
 			boolean busy = !isTurbo && (CONFIG.adaptiveThrottling && avgTickNanos > (long) (CONFIG.busyTickThresholdMs * 1_000_000L));
-			boolean lowTps = !isTurbo && (1000.0 / (avgTickNanos / 1_000_000.0)) < CONFIG.minTpsThreshold;
 
 			if (lowMemory) currentPauseReason = "LOW RAM";
 			else if (tooManyPlayers) currentPauseReason = "PLAYERS ONLINE";
+			else if (stopOffline) currentPauseReason = "OFFLINE";
 			else if (lowDisk) currentPauseReason = "LOW DISK";
-			else if (busy) currentPauseReason = "BUSY TICK (" + (avgTickNanos / 1_000_000L) + "ms)";
-			else if (lowTps) currentPauseReason = "LOW TPS";
-			else if (CONFIG.dryRunMode) { currentPauseReason = "DRY RUN"; showDryRunParticles(currentLevel); }
+			else if (busy) currentPauseReason = "BUSY TICK";
 			else {
 				currentPauseReason = "";
-				int limit = isTurbo ? 128 : (CONFIG.cpuUsageLevel == RenderFastConfig.CpuUsageLevel.LOW ? 16 : 64);
+				int limit = isTurbo ? 16 : 4;
+				if (CONFIG.voxyIntegration || CONFIG.distantHorizonsIntegration) limit = isTurbo ? 8 : 2;
 				requestMoreChunks(currentLevel, limit);
 			}
 
@@ -292,6 +289,15 @@ public class RenderFast implements ModInitializer {
 		} else if (state.paused) currentPauseReason = "MANUAL";
 
 		if (++tickCounter >= BROADCAST_INTERVAL_TICKS) { tickCounter = 0; broadcastProgress(server); }
+		long now = System.currentTimeMillis();
+		if (now - lastConsoleReportTime >= CONFIG.consoleReportIntervalSeconds * 1000L) {
+			lastConsoleReportTime = now;
+			if (state != null && state.started && !state.completed) {
+				int p = (int)(((float)state.doneCount / totalChunks) * 100);
+				LOGGER.info("Progress: {}% ({}/{}) | Speed: {} ch/s | Dim: {}",
+						p, state.doneCount, totalChunks, String.format("%.1f", currentCps), state.dimension);
+			}
+		}
 	}
 
 	private boolean isInsideWorkHours() {
@@ -308,20 +314,9 @@ public class RenderFast implements ModInitializer {
 		long now = System.currentTimeMillis();
 		inFlightStartTimes.forEach((idx, start) -> {
 			if (now - start > CONFIG.watchdogTimeoutSeconds * 1000L) {
-				LOGGER.warn("Watchdog: Chunk index {} timed out after {}s. Retrying...", idx, CONFIG.watchdogTimeoutSeconds);
-				inFlightIndices.remove(idx);
-				inFlightStartTimes.remove(idx);
+				inFlightIndices.remove(idx); inFlightStartTimes.remove(idx);
 			}
 		});
-	}
-
-	private void showDryRunParticles(ServerLevel level) {
-		if (tickCounter % 20 != 0) return;
-		int r = state.radius; int[] dx = {r, -r, 0, 0}; int[] dz = {0, 0, r, -r};
-		for (int i = 0; i < 4; i++) {
-			int x = (state.centerX + dx[i]) << 4; int z = (state.centerZ + dz[i]) << 4;
-			level.sendParticles(ParticleTypes.HAPPY_VILLAGER, x + 8, 100, z + 8, 50, 2, 2, 2, 0.1);
-		}
 	}
 
 	private void requestSafetyChunks(MinecraftServer server) {
@@ -336,19 +331,15 @@ public class RenderFast implements ModInitializer {
 	private void finishDimension(MinecraftServer server) {
 		if (state == null) return;
 		long time = (System.currentTimeMillis() - sessionStartTime) / 1000;
-		String report = String.format("Pregen complete for %s: %d chunks in %ds (%.1f ch/s)", 
-				state.dimension, totalChunks, time, (float) totalChunks / Math.max(1, time));
-		LOGGER.info(report); sendDiscordWebhook(report);
-		server.getPlayerList().getPlayers().forEach(p -> ((ServerLevel)p.level()).playSound(null, p.getX(), p.getY(), p.getZ(), SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, SoundSource.MASTER, 1.0f, 1.0f));
+		LOGGER.info("Pregen complete for {}: {} chunks in {}s", state.dimension, totalChunks, time);
 		
 		int idx = CONFIG.dimensions.indexOf(state.dimension);
 		if (idx >= 0 && idx < CONFIG.dimensions.size() - 1) {
 			ServerLevel next = getLevelForDimension(server, CONFIG.dimensions.get(idx + 1));
-			if (next != null) { startPreload(next, state.centerX, state.centerZ, state.radius); broadcastProgress(server); return; }
+			if (next != null) { startPreload(next, state.centerX, state.centerZ, state.radius); return; }
 		}
 		state.markCompleted();
 		if (!CONFIG.onCompleteCommand.isEmpty()) server.getCommands().performPrefixedCommand(server.createCommandSourceStack(), CONFIG.onCompleteCommand);
-		broadcastProgress(server);
 	}
 
 	private static ServerLevel getLevelForDimension(MinecraftServer s, String d) {
@@ -371,7 +362,7 @@ public class RenderFast implements ModInitializer {
 		}
 	}
 
-	private String formatEta() {
+	private static String formatEta() {
 		if (currentCps <= 0) return "N/A";
 		long remaining = (long)((totalChunks - state.doneCount) / currentCps);
 		return String.format("%dm %ds", remaining / 60, remaining % 60);
@@ -386,9 +377,8 @@ public class RenderFast implements ModInitializer {
 		state.markStarted(cx, cz, dimId, safeRadius); buildSpiral(safeRadius);
 		sessionStartTime = System.currentTimeMillis(); nextRequestIndex = 0;
 		inFlightIndices.clear(); inFlightStartTimes.clear(); completedIndices.clear(); pendingCompletionQueue.clear();
-		chunksGeneratedThisSession = 0; chunksSinceLastSave = 0; refillTaskPending.set(false); cachedTargetStatus = null;
-		LOGGER.info("Starting chunk preload: {} chunks in {} around ({}, {}) with radius {}", totalChunks, dimId, cx, cz, r);
-		sendDiscordWebhook("Chunk preloading started in " + dimId + " (" + totalChunks + " chunks)");
+		cachedTargetStatus = null;
+		LOGGER.info("Starting preload: {} chunks in {}", totalChunks, dimId);
 	}
 
 	private static void sendDiscordWebhook(String m) {
@@ -402,9 +392,7 @@ public class RenderFast implements ModInitializer {
 
 	private static boolean isLowMemory() {
 		Runtime rt = Runtime.getRuntime(); double u = (double) (rt.totalMemory() - rt.freeMemory()) / rt.maxMemory();
-		boolean low = u > CONFIG.memoryUsageThreshold;
-		if (low && CONFIG.aggressiveUnload) System.gc();
-		return low;
+		return u > CONFIG.memoryUsageThreshold;
 	}
 
 	private static void processCompletions(ServerLevel level) {
@@ -414,57 +402,37 @@ public class RenderFast implements ModInitializer {
 			if (idx < 0 || idx >= totalChunks) continue;
 			level.getChunkSource().removeTicketWithRadius(TicketType.FORCED, new ChunkPos(state.centerX + offsetX[idx], state.centerZ + offsetZ[idx]), 0);
 			if (inFlightIndices.remove(idx)) {
-				inFlightStartTimes.remove(idx);
-				completedIndices.add(idx); changed = true; chunksGeneratedThisSession++; chunksSinceLastSave++;
+				inFlightStartTimes.remove(idx); completedIndices.add(idx); changed = true; chunksSinceLastSave++;
 				if (CONFIG.saveIntervalChunks > 0 && chunksSinceLastSave >= CONFIG.saveIntervalChunks) {
-					level.getServer().saveEverything(true, false, true);
-					chunksSinceLastSave = 0;
+					level.getServer().saveEverything(true, false, true); chunksSinceLastSave = 0;
 				}
-				if (CONFIG.restartAfterChunks > 0 && chunksGeneratedThisSession >= CONFIG.restartAfterChunks) level.getServer().halt(false);
 			}
+			if (CONFIG.watchdogBreather && (System.currentTimeMillis() - currentTickStartTime) > CONFIG.breatherThresholdMs) break;
 		}
 		if (changed) { state.doneCount = Math.min(completedIndices.size(), totalChunks); state.setDirty(); }
 	}
 
 	private static void requestMoreChunks(ServerLevel level, int limit) {
-		if (state == null || currentServer == null || currentServer.isStopped() || isLowMemory()) return;
-		if (cachedTargetStatus == null) {
-			String sid = CONFIG.lightingFixMode ? "minecraft:light" : (CONFIG.structureOnlyMode ? "minecraft:structure_starts" : CONFIG.targetStatus);
-			cachedTargetStatus = BuiltInRegistries.CHUNK_STATUS.get(Identifier.parse(sid)).map(Holder.Reference::value).orElse(ChunkStatus.FULL);
-		}
-		if (!CONFIG.pointsOfInterest.isEmpty() && nextRequestIndex == 0) processPOIs(level, cachedTargetStatus);
+		if (state == null || currentServer == null || isLowMemory()) return;
+		if (cachedTargetStatus == null) cachedTargetStatus = BuiltInRegistries.CHUNK_STATUS.get(Identifier.parse(CONFIG.targetStatus)).map(Holder.Reference::value).orElse(ChunkStatus.FULL);
+		
 		int req = 0;
 		while (inFlightIndices.size() < CONFIG.maxConcurrentAsyncChunks && nextRequestIndex < totalChunks && req < limit) {
+			if (CONFIG.watchdogBreather && (System.currentTimeMillis() - currentTickStartTime) > CONFIG.breatherThresholdMs) { inLagRecovery = true; break; }
 			int i = nextRequestIndex++; if (completedIndices.contains(i)) continue;
 			req++; ChunkPos cp = new ChunkPos(state.centerX + offsetX[i], state.centerZ + offsetZ[i]);
 			inFlightIndices.add(i); inFlightStartTimes.put(i, System.currentTimeMillis());
-			level.getChunkSource().addTicketWithRadius(TicketType.FORCED, cp, 0);
-			level.getChunkSource().getChunkFuture(cp.x(), cp.z(), cachedTargetStatus, true).whenComplete((_, _) -> {
-				pendingCompletionQueue.add(i);
-				if (CONFIG.immediateRefill && currentServer != null && !currentServer.isStopped() && refillTaskPending.compareAndSet(false, true)) {
-					// Check if server is already under heavy load before scheduling refill
-					if (!CONFIG.adaptiveThrottling || currentServer.getAverageTickTimeNanos() < (long)(CONFIG.busyTickThresholdMs * 0.8 * 1_000_000L)) {
-						currentServer.execute(() -> {
-							refillTaskPending.set(false);
-							if (currentServer != null && !currentServer.isStopped() && state != null && state.started && !state.completed) {
-								ServerLevel l = getLevelForDimension(currentServer, state.dimension);
-								if (l != null) { processCompletions(l); requestMoreChunks(l, 8); }
-							}
-						});
-					} else {
-						refillTaskPending.set(false); // Drop this refill request to allow server to breathe
-					}
-				}
-			});
+			requestChunkGeneration(level, cp, i);
 		}
 	}
 
-	private static void processPOIs(ServerLevel l, ChunkStatus s) {
-		for (String poi : CONFIG.pointsOfInterest) try {
-			String[] p = poi.split(","); int x = Integer.parseInt(p[0].trim()) >> 4, z = Integer.parseInt(p[1].trim()) >> 4;
-			l.getChunkSource().addTicketWithRadius(TicketType.FORCED, new ChunkPos(x, z), 0);
-			l.getChunkSource().getChunkFuture(x, z, s, true);
-		} catch (Exception ignored) {}
+	private static void requestChunkGeneration(ServerLevel level, ChunkPos cp, int i) {
+		level.getChunkSource().addTicketWithRadius(TicketType.FORCED, cp, 0);
+		try {
+			level.getChunkSource().getChunkFuture(cp.x(), cp.z(), cachedTargetStatus, true).whenComplete((_, _) -> pendingCompletionQueue.add(i));
+		} catch (Exception e) {
+			inFlightIndices.remove(i); inFlightStartTimes.remove(i);
+		}
 	}
 
 	private static void broadcastProgress(MinecraftServer s) {
@@ -477,22 +445,21 @@ public class RenderFast implements ModInitializer {
 	}
 
 	private static byte[] getMapData() {
-		byte[] data = new byte[50]; // 20x20 bitset
-		if (totalChunks <= 0 || state == null) return data;
+		byte[] data = new byte[50]; if (totalChunks <= 0 || state == null) return data;
 		int size = 20;
 		for (int i = 0; i < totalChunks; i++) {
 			if (completedIndices.contains(i)) {
 				int r = state.radius;
-				int xGrid = (int)(((offsetX[i] + r) / (double)(2 * r)) * size);
-				int zGrid = (int)(((offsetZ[i] + r) / (double)(2 * r)) * size);
-				xGrid = Math.clamp(xGrid, 0, size - 1);
-				zGrid = Math.clamp(zGrid, 0, size - 1);
-				int bitIdx = zGrid * size + xGrid;
-				data[bitIdx / 8] |= (byte)(1 << (bitIdx % 8));
+				int xG = (int)(((offsetX[i] + r) / (double)(2 * r)) * size);
+				int zG = (int)(((offsetZ[i] + r) / (double)(2 * r)) * size);
+				int bI = Math.clamp(zG, 0, size-1) * size + Math.clamp(xG, 0, size-1);
+				data[bI / 8] |= (byte)(1 << (bitIdx(bI)));
 			}
 		}
 		return data;
 	}
+
+	private static int bitIdx(int i) { return i % 8; }
 
 	private static void sendProgress(ServerPlayer pl) {
 		if (state == null) return;
